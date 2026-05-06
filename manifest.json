@@ -1,0 +1,20 @@
+{
+  "name": "Notre Histoire ♡",
+  "short_name": "Notre Histoire",
+  "description": "Notre espace privé — A & N",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020c1b",
+  "theme_color": "#020c1b",
+  "lang": "fr",
+  "gcm_sender_id": "103953800507",
+  "icons": [
+    { "src": "/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
