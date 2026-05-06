@@ -1,20 +1,27 @@
 name: 🕙 Notification Quotidienne
+
 on:
   schedule:
-    # 08:00 UTC correspond à 10:00 heure française (été)
-    - cron: '0 8 * * *'
-  workflow_dispatch: # Pour tester manuellement
+    # S'exécute tous les jours à 09:00 UTC (11:00 heure de Lyon en été)
+    - cron: '0 9 * * *'
+  workflow_dispatch: # Permet de lancer le test manuellement
 
 jobs:
-  notify:
+  send-notification:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - name: 📥 Récupération du code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Configuration de Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - run: npm install firebase-admin
-      - name: Lancer la notification
+          node-version: '20'
+
+      - name: 📦 Installation des dépendances
+        run: npm install firebase-admin
+
+      - name: 🚀 Envoi de la notification
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
         run: node notify.js
