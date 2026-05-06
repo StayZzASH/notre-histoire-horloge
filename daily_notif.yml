@@ -1,0 +1,58 @@
+# .github/workflows/daily_notif.yml
+# Cron quotidien — "Notre Histoire" ♡
+# Déclenche notify.js chaque matin à 10h00 heure de Paris (= 08h00 UTC en hiver, 09h00 UTC en été)
+# Solution : on utilise 08h00 UTC (hiver) — couvre le cas général.
+# Si tu veux 09h00 UTC (heure d'été), change l'heure ci-dessous.
+
+name: 🕙 Notification Quotidienne
+
+on:
+  # ── Déclenchement automatique chaque matin à 10h Paris (08h UTC) ──────────
+  schedule:
+    - cron: "0 8 * * *"   # 10h00 heure de Paris (UTC+2 en été → 08h UTC)
+
+  # ── Déclenchement manuel pour tes tests ───────────────────────────────────
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Raison du déclenchement manuel (optionnel)"
+        required: false
+        default: "Test manuel"
+
+jobs:
+  send-notification:
+    name: Envoyer la notification du jour ♡
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Récupère le code du repo
+      - name: 📥 Checkout du dépôt
+        uses: actions/checkout@v4
+
+      # 2. Configure Node.js 18
+      - name: 🟢 Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      # 3. Installe firebase-admin (pas besoin de package.json complet)
+      - name: 📦 Installation de firebase-admin
+        run: npm install firebase-admin
+
+      # 4. Lance le script — injecte le Secret Firebase
+      - name: 🚀 Envoi de la notification
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node notify.js
+
+      # 5. (Optionnel) Affiche un résumé dans l'onglet Actions
+      - name: 📋 Résumé
+        if: always()
+        run: |
+          echo "### 🕙 Notification du $(date '+%d/%m/%Y à %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "Déclencheur : **${{ github.event_name }}**" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "Statut : ✅ Envoyée avec succès" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Statut : ❌ Échec — consulte les logs" >> $GITHUB_STEP_SUMMARY
+          fi
