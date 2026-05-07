@@ -97,7 +97,7 @@ async function sendDailyNotification() {
         badge: "/icon-72.png",
         vibrate: [200, 100, 200],
       },
-      fcmOptions: { link: "https://love-67092.web.app" },
+      fcmOptions: { link: "https://loveansit.netlify.app/" },
     },
     android: {
       notification: {
