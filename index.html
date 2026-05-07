@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notre Histoire ♡</title>
+  <!-- Firebase FIRST — doit être chargé avant Babel qui compile le JSX de façon asynchrone -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script>
+    /* ── Firebase init ─────────────────────────────────────────────────────────
+       Les scripts firebase-app-compat.js et firebase-firestore-compat.js sont
+       des <script> synchrones placés juste avant ce bloc → firebase est garanti
+       disponible ici. On init de façon 100 % synchrone, sans setTimeout.       */
+    (function() {
+      var _app = firebase.apps.length
+        ? firebase.apps[0]
+        : firebase.initializeApp({
+            apiKey: "AIzaSyAg98bxN-3ZYAdpfyy1-cd1g8tugOMKva8",
+            authDomain: "love-67092.firebaseapp.com",
+            projectId: "love-67092",
+            messagingSenderId: "734347959336",
+            appId: "1:734347959336:web:07de94241ab0ea8135e91d"
+          });
+      var _db = firebase.firestore();
+
+      window.fbGetPlaylist    = function() { return _db.collection("playlist").orderBy("order").get().then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data());})}); };
+      window.fbSetPlaylist    = function(songs) { return Promise.all(songs.map(function(s,i){return _db.collection("playlist").doc(s.id).set(Object.assign({},s,{order:i}));})); };
+      window.fbDeleteSong     = function(id) { return _db.collection("playlist").doc(id).delete(); };
+      window.fbGetPhotos      = function() { return _db.collection("photos").orderBy("createdAt","desc").get().then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data());})}); };
+      window.fbDeletePhoto    = function(id) { return _db.collection("photos").doc(id).delete(); };
+      window.fbUploadPhoto    = function(id, base64, caption, date) {
+        return new Promise(function(res, rej) {
+          var img = new Image();
+          img.onload = function() {
+            var maxW=800, w=img.width, h=img.height;
+            if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+            var c=document.createElement("canvas"); c.width=w; c.height=h;
+            c.getContext("2d").drawImage(img,0,0,w,h);
+            var compressed = c.toDataURL("image/jpeg",0.75);
+            _db.collection("photos").doc(id).set({url:compressed,caption:caption,date:date,createdAt:Date.now()})
+              .then(function(){ res(compressed); }).catch(rej);
+          };
+          img.onerror = rej;
+          img.src = base64;
+        });
+      };
+      window.fbAddMessage     = function(id,text,unlockDate,author) { return _db.collection("messages_caches").doc(id).set({text:text,unlockDate:unlockDate,author:author,createdAt:Date.now()}); };
+      window.fbGetMessages    = function() { return _db.collection("messages_caches").orderBy("createdAt","desc").get().then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data());})}); };
+      window.fbDeleteMessage  = function(id) { return _db.collection("messages_caches").doc(id).delete(); };
+      window.fbGetHearts      = function() { return _db.collection("counters").doc("global_hearts").get().then(function(s){ return s.exists ? s.data() : {count_boeuf:0,count_poulet:0}; }); };
+
+      // ── Écoute temps réel des cœurs ────────────────────────────────────────
+      window.fbOnSnapshotHearts = function(callback) {
+        var ref = _db.collection("counters").doc("global_hearts");
+        return ref.onSnapshot(function(snap) {
+          callback(snap.exists ? snap.data() : {count_boeuf:0, count_poulet:0});
+        }, function(err) { console.error("onSnapshot hearts:", err); });
+      };
+
+      // ── Écoute temps réel des messages ─────────────────────────────────────
+      window.fbOnSnapshotMessages = function(callback) {
+        return _db.collection("messages_caches").orderBy("createdAt","desc")
+          .onSnapshot(function(snap) {
+            callback(snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }));
+          }, function(err) { console.error("onSnapshot messages:", err); });
+      };
+
+      // ── Notifications push (FCM) ────────────────────────────────────────────
+      window.fbInitMessaging = function(userLabel) {
+        try {
+          var messaging = firebase.messaging();
+          Notification.requestPermission()
+            .then(function(permission) {
+              if (permission !== "granted") { console.log("Notifications refusées."); return; }
+              return messaging.getToken({ vapidKey: "BIAJeIj68VqFI49RViIlY9rAgY_bPDXp7sMkNJMGRLplb6in8gFUN94dk_05rmDj80sQFRIFaRhdWlLODs1OZ5I" })
+                .then(function(token) {
+                  if (!token) { console.warn("Pas de token FCM."); return; }
+                  console.log("Token FCM reçu :", token);
+                  // Sauvegarde le token dans Firestore avec l'identité de l'utilisateur
+                  return _db.collection("fcm_tokens").doc(token).set({
+                    user: userLabel,
+                    createdAt: Date.now()
+                  });
+                });
+            })
+            .catch(function(err) { console.warn("Erreur messaging :", err); });
+        } catch(e) { console.warn("Firebase Messaging non disponible :", e); }
+      };
+
+      window.fbIncrementHeart = function(field) {
+        var ref = _db.collection("counters").doc("global_hearts");
+        return ref.get().then(function(snap) {
+          var p = snap.exists ? Promise.resolve() : ref.set({count_boeuf:0,count_poulet:0});
+          return p.then(function() {
+            var upd = {}; upd[field] = firebase.firestore.FieldValue.increment(1);
+            return ref.update(upd);
+          }).then(function() { return ref.get(); }).then(function(s){ return s.data(); });
+        });
+      };
+    })();
+  </script>
+  <style>body{margin:0;background:#020c1b}#root{min-height:100vh}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel-pending" id="main-babel-script">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const PASS_ELLE = "boulette poulet";   // accès elle
+const PASS_LUI  = "boulette boeuf";    // accès lui (admin par défaut)
+const START_DATE = new Date("2025-03-21T00:00:00");
+
+// Firebase est init synchrone dans le <head>.
+function waitForFirebase() { return Promise.resolve(); }
+
+// Appel sécurisé : vérifie que la fn existe avant d'appeler
+function fbCall(fnName, ...args) {
+  if (typeof window[fnName] !== "function") {
+    // Firebase CDN n'a pas encore chargé → réessayer dans 200ms, max 10s
+    return new Promise(function(resolve, reject) {
+      var tries = 0;
+      var t = setInterval(function() {
+        tries++;
+        if (typeof window[fnName] === "function") {
+          clearInterval(t);
+          resolve(window[fnName](...args));
+        } else if (tries > 50) {
+          clearInterval(t);
+          reject(new Error("Firebase non disponible. Vérifie ta connexion et recharge la page."));
+        }
+      }, 200);
+    });
+  }
+  return Promise.resolve(window[fnName](...args));
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+}
+
+const USER_META = {
+  lui:  { label:"A", emoji:"💙" },
+  elle: { label:"N", emoji:"🌸" },
+};
+
+function getLastVisit(user) {
+  try { return localStorage.getItem(`lastVisit_${user}`); } catch { return null; }
+}
+function saveVisit(user) {
+  try { localStorage.setItem(`lastVisit_${user}`, new Date().toISOString()); } catch {}
+}
+function fmtVisit(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 2) return "à l'instant";
+  if (diffMin < 60) return `il y a ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `il y a ${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  return `il y a ${diffD}j`;
+}
+
+function useTimer() {
+  const [t, setT] = useState({ days:0, hours:0, minutes:0, seconds:0 });
+  useEffect(() => {
+    const tick = () => {
+      const ms = Math.max(0, Date.now() - START_DATE.getTime());
+      setT({ days:Math.floor(ms/86400000), hours:Math.floor(ms/3600000)%24, minutes:Math.floor(ms/60000)%60, seconds:Math.floor(ms/1000)%60 });
+    };
+    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
+  }, []);
+  return t;
+}
+
+function getAnniversaries() {
+  const end = new Date(); end.setHours(23,59,59,999);
+  const list = []; let n = 1;
+  while (list.length < 6 && n < 300) {
+    const d = new Date(START_DATE); d.setMonth(START_DATE.getMonth()+n);
+    if (d > end) list.push({ num:n, date:d }); n++;
+  }
+  return list;
+}
+function getProgress(ann) {
+  const prev = new Date(START_DATE); prev.setMonth(START_DATE.getMonth()+ann.num-1);
+  return +(Math.min(100,Math.max(0,((Date.now()-prev.getTime())/(ann.date.getTime()-prev.getTime()))*100)).toFixed(1));
+}
+function getDaysUntil(date) { return Math.max(0,Math.ceil((date.getTime()-Date.now())/86400000)); }
+
+const G = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Outfit:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{background:#020c1b;color:#e2e8f0}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#020c1b}::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulseGlow{0%,100%{box-shadow:0 0 20px rgba(59,130,246,.2)}50%{box-shadow:0 0 40px rgba(59,130,246,.45)}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(400%)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes flicker{0%,91%,95%,100%{opacity:1}92%,94%{opacity:.8}}
+    @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
+    @keyframes flashbackIn{from{opacity:0;transform:scale(1.08)}to{opacity:1;transform:scale(1)}}
+    @keyframes vinylSpin{to{transform:rotate(360deg)}}
+    @keyframes barBounce{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+    .eq-bar{display:inline-block;width:3px;border-radius:2px;transform-origin:bottom;background:#fff;margin:0 1px}
+    .eq-bar-1{animation:barBounce .6s ease-in-out infinite}
+    .eq-bar-2{animation:barBounce .6s .15s ease-in-out infinite}
+    .eq-bar-3{animation:barBounce .6s .3s ease-in-out infinite}
+    .fade-up{animation:fadeUp .7s ease forwards}
+    .fade-up-d1{animation:fadeUp .7s .1s ease both}
+    .fade-up-d2{animation:fadeUp .7s .25s ease both}
+    .fade-up-d3{animation:fadeUp .7s .4s ease both}
+    .fade-up-d4{animation:fadeUp .7s .55s ease both}
+    .fade-up-d5{animation:fadeUp .7s .7s ease both}
+    .glow-pulse{animation:pulseGlow 3s ease-in-out infinite}
+    .float-anim{animation:float 4s ease-in-out infinite}
+    .counter-digit{font-family:'Space Mono',monospace;animation:flicker 8s ease-in-out infinite}
+    .btn-primary{background:linear-gradient(135deg,#1d4ed8,#2563eb);border:1px solid #3b82f6;color:#fff;padding:10px 24px;border-radius:6px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;transition:all .2s}
+    .btn-primary:hover{background:linear-gradient(135deg,#2563eb,#3b82f6);transform:translateY(-1px);box-shadow:0 8px 20px rgba(59,130,246,.3)}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .btn-ghost{background:transparent;border:1px solid #1e3a5f;color:#94a3b8;padding:8px 20px;border-radius:6px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;transition:all .2s}
+    .btn-ghost:hover{border-color:#3b82f6;color:#60a5fa}
+    .btn-danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;transition:all .2s}
+    .btn-danger:hover{background:rgba(239,68,68,.2)}
+    .photo-card{position:relative;border-radius:8px;overflow:hidden;border:1px solid #1e3a5f;background:#0d1b2a;aspect-ratio:1;cursor:pointer;transition:transform .3s,box-shadow .3s}
+    .photo-card:hover{transform:translateY(-4px) scale(1.01);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 20px rgba(59,130,246,.15)}
+    .photo-card img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s}
+    .photo-card:hover img{transform:scale(1.06)}
+    .photo-card .overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(2,12,27,.9) 0%,transparent 50%);opacity:0;transition:opacity .3s;display:flex;align-items:flex-end;padding:14px}
+    .photo-card:hover .overlay{opacity:1}
+    input[type=text],input[type=password],input[type=date],textarea{background:#0a1628;border:1px solid #1e3a5f;border-radius:6px;color:#e2e8f0;padding:10px 14px;font-family:'Outfit',sans-serif;font-size:14px;outline:none;width:100%;transition:border-color .2s}
+    input:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+    input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5) sepia(1) saturate(3) hue-rotate(190deg);cursor:pointer}
+    .nav-link{font-family:'Outfit',sans-serif;font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#475569;cursor:pointer;transition:color .2s;padding:4px 0;position:relative}
+    .nav-link::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:#3b82f6;transform:scaleX(0);transition:transform .2s}
+    .nav-link:hover,.nav-link.active{color:#93c5fd}
+    .nav-link:hover::after,.nav-link.active::after{transform:scaleX(1)}
+    .progress-bar-track{background:rgba(30,58,95,.3);border-radius:999px;height:4px;overflow:hidden}
+    .progress-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#1d4ed8,#60a5fa);transition:width 1s ease;box-shadow:0 0 8px rgba(96,165,250,.5)}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,12,27,.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeUp .2s ease}
+    .corner-bracket{position:absolute;width:20px;height:20px}
+    .corner-bracket::before,.corner-bracket::after{content:'';position:absolute;background:#3b82f6}
+    .corner-bracket.tl{top:0;left:0}.corner-bracket.tl::before{top:0;left:0;width:100%;height:1px}.corner-bracket.tl::after{top:0;left:0;height:100%;width:1px}
+    .corner-bracket.tr{top:0;right:0}.corner-bracket.tr::before{top:0;right:0;width:100%;height:1px}.corner-bracket.tr::after{top:0;right:0;height:100%;width:1px}
+    .corner-bracket.bl{bottom:0;left:0}.corner-bracket.bl::before{bottom:0;left:0;width:100%;height:1px}.corner-bracket.bl::after{bottom:0;left:0;height:100%;width:1px}
+    .corner-bracket.br{bottom:0;right:0}.corner-bracket.br::before{bottom:0;right:0;width:100%;height:1px}.corner-bracket.br::after{bottom:0;right:0;height:100%;width:1px}
+    .anniv-row{transition:background .2s,border-color .2s}
+    .anniv-row:hover{background:rgba(30,58,95,.15)!important;border-color:#1e3a5f!important}
+    .lightbox{position:fixed;inset:0;background:rgba(2,12,27,.96);display:flex;align-items:center;justify-content:center;z-index:2000;animation:fadeUp .2s ease}
+    .lightbox img{max-width:90vw;max-height:85vh;object-fit:contain;border-radius:4px;box-shadow:0 0 60px rgba(0,0,0,.8)}
+  `}</style>
+);
+
+function BgDecor() {
+  return (
+    <svg style={{position:"fixed",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:0,opacity:.35}} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="g1" cx="20%" cy="30%" r="40%"><stop offset="0%" stopColor="#1e3a5f" stopOpacity=".6"/><stop offset="100%" stopColor="#020c1b" stopOpacity="0"/></radialGradient>
+        <radialGradient id="g2" cx="80%" cy="70%" r="35%"><stop offset="0%" stopColor="#0f2a4a" stopOpacity=".5"/><stop offset="100%" stopColor="#020c1b" stopOpacity="0"/></radialGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#g1)"/><rect width="100%" height="100%" fill="url(#g2)"/>
+      {Array.from({length:12},(_,i)=><line key={`v${i}`} x1={`${(i+1)*8.33}%`} y1="0" x2={`${(i+1)*8.33}%`} y2="100%" stroke="#1e3a5f" strokeWidth=".5" strokeOpacity=".3"/>)}
+      {Array.from({length:8},(_,i)=><line key={`h${i}`} x1="0" y1={`${(i+1)*12.5}%`} x2="100%" y2={`${(i+1)*12.5}%`} stroke="#1e3a5f" strokeWidth=".5" strokeOpacity=".3"/>)}
+      <path d="M -100 400 Q 300 100 800 500 T 1800 200" stroke="#1e3a5f" strokeWidth="1" fill="none" strokeOpacity=".5"/>
+      <path d="M 0 800 Q 400 400 900 700 T 1900 300" stroke="#0f2a4a" strokeWidth="1" fill="none" strokeOpacity=".4"/>
+    </svg>
+  );
+}
+
+function Digit({value,label}) {
+  const s = String(value).padStart(2,"0");
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+      <div className="glow-pulse" style={{position:"relative",overflow:"hidden",background:"linear-gradient(160deg,#0d1b2a,#081423)",border:"1px solid #1e3a5f",borderRadius:10,padding:"16px 22px",minWidth:80,textAlign:"center"}}>
+        <div style={{position:"absolute",left:0,right:0,height:"30%",background:"linear-gradient(to bottom,transparent,rgba(96,165,250,.04),transparent)",animation:"scanline 3s linear infinite",pointerEvents:"none"}}/>
+        <div style={{height:1,background:"rgba(30,58,95,.6)",position:"absolute",top:"50%",left:0,right:0}}/>
+        <span className="counter-digit" style={{fontSize:"clamp(28px,4vw,48px)",fontWeight:700,color:"#93c5fd",letterSpacing:4,display:"block",lineHeight:1.1,textShadow:"0 0 20px rgba(147,197,253,.5)"}}>{s}</span>
+      </div>
+      <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>{label}</span>
+    </div>
+  );
+}
+function Sep(){return <span style={{fontFamily:"'Space Mono',monospace",color:"#1e3a5f",fontSize:"clamp(22px,3vw,40px)",paddingBottom:22,userSelect:"none"}}>:</span>;}
+
+const GRADIENTS=[
+  "linear-gradient(135deg,#1a1a2e,#16213e,#0f3460,#533483)",
+  "linear-gradient(135deg,#0d1b2a,#1b4332,#2d6a4f,#095d40)",
+  "linear-gradient(135deg,#2d0036,#4a0050,#7b2d8b,#3b82f6)",
+  "linear-gradient(135deg,#1a0533,#2d1b69,#11998e,#38ef7d)",
+  "linear-gradient(135deg,#0f0c29,#302b63,#24243e,#ef32d9)",
+  "linear-gradient(135deg,#0a0a0a,#1a237e,#283593,#5c6bc0)",
+  "linear-gradient(135deg,#1a0000,#4a0010,#b71c1c,#e57373)",
+  "linear-gradient(135deg,#004d4d,#006666,#00897b,#26c6da)",
+];
+
+// ─── Compteurs de cœurs ───────────────────────────────────────────────────────
+function HeartsBlock({user}) {
+  const [counts, setCounts] = useState({count_boeuf:0, count_poulet:0});
+  const [loading, setLoading] = useState(true);
+  const [bumping, setBumping] = useState(null); // "boeuf"|"poulet"
+
+  useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotHearts((data) => {
+        setCounts(data);
+        setLoading(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  const handleHeart = async (field) => {
+    setBumping(field);
+    setTimeout(() => setBumping(null), 400);
+    try {
+      await waitForFirebase();
+      const updated = await fbCall('fbIncrementHeart', field);
+      setCounts(updated);
+    } catch(e) { console.error(e); }
+  };
+
+  // Determine which side is "mine" vs "theirs" based on user
+  const myField    = user === "lui" ? "count_boeuf"  : "count_poulet";
+  const theirField = user === "lui" ? "count_poulet" : "count_boeuf";
+  const myLabel    = user === "lui" ? "Moi 💙"       : "Moi 🌸";
+  const theirLabel = user === "lui" ? "Elle 🌸"      : "Lui 💙";
+
+  const HeartCounter = ({field, label, clickable}) => {
+    const count = counts[field] ?? 0;
+    const isBumping = bumping === field;
+    // Color reflects who OWNS this counter, not who is logged in
+    const isBoeuf = field === "count_boeuf";
+    const color = isBoeuf ? "#93c5fd" : "#f9a8d4";
+    const glow  = isBoeuf ? "rgba(147,197,253,.4)" : "rgba(249,168,212,.4)";
+    return (
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:12,padding:"24px 16px",background:clickable?"rgba(29,78,216,.06)":"rgba(13,27,42,.5)",border:`1px solid ${clickable?"rgba(59,130,246,.3)":"rgba(30,58,95,.4)"}`,borderRadius:12,position:"relative"}}>
+        {clickable && <><div className="corner-bracket tl"/><div className="corner-bracket br"/></>}
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:clickable?color:"#475569"}}>{label}</span>
+        <div style={{fontFamily:"'Space Mono',monospace",fontSize:"clamp(40px,8vw,72px)",fontWeight:700,color:clickable?color:"#334155",lineHeight:1,textShadow:clickable?`0 0 30px ${glow}`:"none",transform:isBumping?"scale(1.25)":"scale(1)",transition:"transform .15s cubic-bezier(.34,1.56,.64,1)"}}>{loading?"…":count}</div>
+        <button
+          onClick={clickable ? ()=>handleHeart(field) : undefined}
+          disabled={!clickable || loading}
+          style={{fontSize:32,background:"none",border:"none",cursor:clickable?"pointer":"default",opacity:clickable?1:.2,transform:isBumping?"scale(1.5) rotate(-15deg)":"scale(1)",transition:"transform .15s cubic-bezier(.34,1.56,.64,1)",filter:clickable?`drop-shadow(0 0 8px ${glow})`:"none",padding:0,lineHeight:1,color:clickable?color:"#334155"}}
+          title={clickable?"Envoyer un cœur ♡":"Compteur de l'autre"}
+        >♡</button>
+        {!clickable && <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,color:"#1e3a5f",textTransform:"uppercase"}}>lecture seule</span>}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fade-up-d2" style={{marginBottom:48}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Nos Cœurs</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+      <div style={{display:"flex",gap:16,maxWidth:500,margin:"0 auto"}}>
+        <HeartCounter field={theirField} label={theirLabel} clickable={false}/>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#1e3a5f",flexShrink:0}}>♡</div>
+        <HeartCounter field={myField} label={myLabel} clickable={true}/>
+      </div>
+      <p style={{textAlign:"center",marginTop:12,fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,color:"#1e3a5f"}}>
+        ✦ Clique sur ton cœur pour en envoyer un ✦
+      </p>
+    </div>
+  );
+}
+
+// ─── Aperçu capsules sur HomePage ────────────────────────────────────────────
+function parseLocalDate(str) {
+  if (!str) return new Date(0);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y,mo,d] = str.split("-").map(Number);
+    return new Date(y, mo-1, d, 0, 0, 0, 0);
+  }
+  return new Date(str);
+}
+
+function HomeCapsulesBlock({user}) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotMessages((data) => {
+        setMessages(data);
+        setLoading(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  // Show only messages addressed TO the current user (sent by the other)
+  const forMe = messages.filter(m => m.author !== user);
+  if (!loading && forMe.length === 0) return null;
+
+  return (
+    <div className="fade-up-d3" style={{marginBottom:48}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Messages Secrets</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+      {loading && (
+        <div style={{textAlign:"center",padding:"32px 0"}}><div style={{width:24,height:24,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>
+      )}
+      {!loading && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {forMe.map(msg => <HomeCapsuleCard key={msg.id} msg={msg}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomeCapsuleCard({msg}) {
+  const unlockTs = parseLocalDate(msg.unlockDate).getTime();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (Date.now() >= unlockTs) return;
+    const id = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (n >= unlockTs) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [unlockTs]);
+
+  const unlocked = now >= unlockTs;
+  const diffMs = Math.max(0, unlockTs - now);
+  const cntD = Math.floor(diffMs/86400000);
+  const cntH = Math.floor(diffMs/3600000)%24;
+  const cntM = Math.floor(diffMs/60000)%60;
+  const cntS = Math.floor(diffMs/1000)%60;
+  const authorLabel = msg.author === "lui" ? "De Lui 💙" : "D'Elle 🌸";
+  const fmt = ts => new Date(ts).toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+
+  return (
+    <div style={{background:"rgba(13,27,42,.8)",border:`1px solid ${unlocked?"rgba(96,165,250,.3)":"rgba(30,58,95,.4)"}`,borderRadius:12,padding:"20px",position:"relative",transition:"border-color .6s"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>{unlocked?"💌":"🔒"}</span>
+          <div>
+            <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:msg.author==="lui"?"#3b82f6":"#f472b6"}}>{authorLabel}</div>
+            <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#334155"}}>{unlocked?`Débloqué le ${fmt(unlockTs)}`:`Se dévoile le ${fmt(unlockTs)}`}</div>
+          </div>
+        </div>
+        {unlocked
+          ? <span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:"#22c55e",letterSpacing:1}}>✓ OUVERT</span>
+          : <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:"#334155",letterSpacing:1}}>
+              {cntD>0&&`${cntD}j `}{String(cntH).padStart(2,"0")}:{String(cntM).padStart(2,"0")}:{String(cntS).padStart(2,"0")}
+            </span>
+        }
+      </div>
+      <div style={{position:"relative",borderRadius:8,overflow:"hidden"}}>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,lineHeight:1.8,color:"#cbd5e1",padding:"14px 18px",background:"rgba(8,20,35,.6)",borderRadius:8,border:"1px solid rgba(30,58,95,.3)",margin:0,filter:unlocked?"none":"blur(12px)",userSelect:unlocked?"auto":"none",pointerEvents:unlocked?"auto":"none",transition:"filter .8s ease",minHeight:52}}>{msg.text}</p>
+        {!unlocked&&(
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:8,pointerEvents:"none"}}>
+            <div style={{fontSize:26,marginBottom:4}}>🔒</div>
+            <span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#475569",letterSpacing:2}}>Message scellé</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Flashback (Slot Machine Photo) ──────────────────────────────────────────
+function FlashbackBlock() {
+  const [photos, setPhotos] = useState([]);
+  const [current, setCurrent] = useState(null);
+  const [animKey, setAnimKey] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
+  const photosRef = useRef([]);
+  const intervalRef = useRef(null);
+
+  const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
+
+  const showRandom = useCallback(() => {
+    const pool = photosRef.current;
+    if (!pool.length) return;
+    setCurrent(pickRandom(pool));
+    setAnimKey(k => k + 1);
+  }, []);
+
+  // Random interval between 10 and 15 seconds
+  const scheduleNext = useCallback(() => {
+    clearInterval(intervalRef.current);
+    const delay = 10000 + Math.random() * 5000;
+    intervalRef.current = setTimeout(() => {
+      showRandom();
+      scheduleNext();
+    }, delay);
+  }, [showRandom]);
+
+  useEffect(() => {
+    waitForFirebase().then(async () => {
+      try {
+        const data = await fbCall('fbGetPhotos');
+        photosRef.current = data;
+        setPhotos(data);
+        setLoaded(true);
+        if (data.length) {
+          const first = pickRandom(data);
+          setCurrent(first);
+          setAnimKey(1);
+          scheduleNext();
+        }
+      } catch(e) { setLoaded(true); }
+    });
+    return () => clearTimeout(intervalRef.current);
+  }, [scheduleNext]);
+
+  const handleClick = () => {
+    if (current) setLightbox(current);
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <div className="fade-up-d2" style={{marginBottom:48}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Flashback</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+
+      {/* Fallback: no photos yet */}
+      {!photos.length ? (
+        <div style={{position:"relative",borderRadius:14,border:"1px solid #1e3a5f",background:"#0d1b2a",maxWidth:420,margin:"0 auto",padding:"48px 24px",textAlign:"center",boxShadow:"0 0 40px rgba(29,78,216,.08)"}}>
+          <div className="corner-bracket tl"/><div className="corner-bracket tr"/>
+          <div className="corner-bracket bl"/><div className="corner-bracket br"/>
+          <div style={{fontSize:36,marginBottom:16,opacity:.3}}>🖼️</div>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:18,color:"#334155",lineHeight:1.7}}>
+            Nos futurs souvenirs s'afficheront ici... ♡
+          </p>
+        </div>
+      ) : (
+        <>
+          <div
+            onClick={handleClick}
+            title="Cliquer pour voir en grand"
+            style={{position:"relative",borderRadius:14,overflow:"hidden",border:"1px solid #1e3a5f",background:"#0d1b2a",maxWidth:420,margin:"0 auto",cursor:"pointer",boxShadow:"0 0 40px rgba(29,78,216,.12)",transition:"box-shadow .3s"}}
+            onMouseEnter={e=>e.currentTarget.style.boxShadow="0 0 60px rgba(59,130,246,.22)"}
+            onMouseLeave={e=>e.currentTarget.style.boxShadow="0 0 40px rgba(29,78,216,.12)"}
+          >
+            <div className="corner-bracket tl"/><div className="corner-bracket tr"/>
+            <div className="corner-bracket bl"/><div className="corner-bracket br"/>
+            {current && (
+              <img
+                key={animKey}
+                src={current.url}
+                alt={current.caption||"souvenir"}
+                style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",display:"block",animation:"flashbackIn .55s cubic-bezier(.22,1,.36,1) both"}}
+              />
+            )}
+            {/* Overlay gradient + info */}
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(2,12,27,.85) 0%,transparent 55%)",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"14px 18px",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
+              <div>
+                {current?.caption&&<p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#e2e8f0",margin:0,lineHeight:1.4}}>{current.caption}</p>}
+                {current?.date&&<p style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:"#475569",margin:0,letterSpacing:1,marginTop:4}}>{current.date}</p>}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,opacity:.5}}>
+                <span style={{fontSize:18}}>🔍</span>
+                <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#334155",letterSpacing:1}}>voir</span>
+              </div>
+            </div>
+          </div>
+          <p style={{textAlign:"center",marginTop:12,fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,color:"#1e3a5f"}}>
+            ✦ Change automatiquement · clique pour agrandir ✦
+          </p>
+        </>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="lightbox" onClick={()=>setLightbox(null)}>
+          <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:12}} onClick={e=>e.stopPropagation()}>
+            <img src={lightbox.url} alt={lightbox.caption||"souvenir"} style={{maxWidth:"90vw",maxHeight:"80vh",objectFit:"contain",borderRadius:6,boxShadow:"0 0 60px rgba(0,0,0,.8)",border:"1px solid #1e3a5f"}}/>
+            {(lightbox.caption||lightbox.date) && (
+              <div style={{textAlign:"center"}}>
+                {lightbox.caption&&<p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:18,color:"#e2e8f0",margin:0}}>{lightbox.caption}</p>}
+                {lightbox.date&&<p style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:"#475569",margin:"4px 0 0",letterSpacing:1}}>{lightbox.date}</p>}
+              </div>
+            )}
+            <button onClick={()=>setLightbox(null)} style={{position:"absolute",top:-40,right:0,background:"none",border:"none",color:"#475569",fontSize:28,cursor:"pointer",lineHeight:1}}>✕</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomePage({isAdmin, user}) {
+  const t = useTimer();
+  const anniversaries = getAnniversaries();
+  const months=["jan","fév","mar","avr","mai","juin","juil","aoû","sep","oct","nov","déc"];
+  const fmt=(d)=>`${String(d.getDate()).padStart(2,"0")} ${months[d.getMonth()]} ${d.getFullYear()}`;
+
+  const [songs,setSongs]=useState([]);
+  const [loadingSongs,setLoadingSongs]=useState(true);
+  const [showSongForm,setShowSongForm]=useState(false);
+  const [songTitle,setSongTitle]=useState("");
+  const [songArtist,setSongArtist]=useState("");
+  const [songWhy,setSongWhy]=useState("");
+  const [songError,setSongError]=useState("");
+  const [playingId,setPlayingId]=useState(null);
+  const [songColor,setSongColor]=useState(0);
+
+  useEffect(()=>{
+    waitForFirebase().then(async()=>{
+      try{const data=await fbCall('fbGetPlaylist');setSongs(data);}
+      catch(e){console.error("Playlist Firebase error:",e);setSongError("Impossible de charger la playlist. Vérifiez les règles Firestore.");}
+      setLoadingSongs(false);
+    });
+  },[]);
+
+  const addSong=async()=>{
+    if(!songTitle.trim()||!songArtist.trim()){setSongError("Titre et artiste requis.");return;}
+    const s={id:Date.now().toString(36),title:songTitle.trim(),artist:songArtist.trim(),why:songWhy.trim(),color:songColor};
+    const updated=[...songs,s];
+    await waitForFirebase();
+    await fbCall('fbSetPlaylist', updated);
+    setSongs(updated);setSongTitle("");setSongArtist("");setSongWhy("");setSongError("");setSongColor(0);setShowSongForm(false);
+  };
+  const removeSong=async(id)=>{await waitForFirebase();await fbCall('fbDeleteSong', id);setSongs(p=>p.filter(s=>s.id!==id));};
+
+  return (
+    <div style={{position:"relative",zIndex:1,padding:"60px 24px 80px",maxWidth:860,margin:"0 auto"}}>
+      <div className="fade-up" style={{textAlign:"center",marginBottom:8}}>
+        <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — 21.03.2025 — ◆</span>
+      </div>
+      <h1 className="fade-up-d1" style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(42px,7vw,80px)",fontWeight:300,textAlign:"center",lineHeight:1.05,color:"#e2e8f0",letterSpacing:-1,marginBottom:8}}>
+        Pour Toi,<br/><em style={{color:"#93c5fd",fontWeight:300}}>Mon Amour</em>
+      </h1>
+      <div className="fade-up-d1" style={{display:"flex",alignItems:"center",gap:16,margin:"24px 0"}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{color:"#1e3a5f",fontSize:10}}>♡</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+      <div className="fade-up-d2" style={{position:"relative",background:"linear-gradient(135deg,rgba(13,27,42,.8),rgba(8,20,35,.8))",border:"1px solid #0f2a4a",borderRadius:12,padding:"36px 40px",marginBottom:48,backdropFilter:"blur(10px)"}}>
+        <div className="corner-bracket tl"/><div className="corner-bracket tr"/>
+        <div className="corner-bracket bl"/><div className="corner-bracket br"/>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(15px,2vw,19px)",fontWeight:300,fontStyle:"italic",lineHeight:2,color:"#94a3b8",textAlign:"center",marginBottom:24}}>
+          Je me vois pas sans toi — t'es mon plus beau choix,<br/>et je te choisis chaque jour, encore et encore.
+        </p>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><div style={{flex:1,height:1,background:"rgba(30,58,95,.4)"}}/><span style={{color:"#1e3a5f",fontSize:9}}>◆</span><div style={{flex:1,height:1,background:"rgba(30,58,95,.4)"}}/></div>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(17px,2.5vw,22px)",fontWeight:300,fontStyle:"italic",lineHeight:1.9,color:"#cbd5e1",textAlign:"center"}}>
+          T'es la plus belle chose qui me soit arrivée.<br/>
+          <span style={{color:"#93c5fd"}}>Avec toi je suis moi — je me sens chez moi.</span><br/>
+          Ma moitié, c'est toi. Mon bonheur, c'est toi.<br/><br/>
+          T'es incroyable, vraie, unique, magnifique —<br/>exactement la femme qu'il me fallait.<br/>
+          On est tellement à l'aise ensemble,<br/>que des fous rires, et j'aime trop ça.<br/><br/>
+          <span style={{color:"#60a5fa"}}>Dans ma vie, c'est toi avant tout.</span><br/>
+          Même quand on se dispute, je t'aime du plus profond de mon cœur.<br/>
+          On avance ensemble — et je ne partirai jamais.<br/><br/>
+          Je nous vois très loin :<br/>mariage, enfants, voyages et plus encore.<br/>
+          <span style={{color:"#93c5fd"}}>C'est toi que je veux pour le restant de ma vie.</span><br/><br/>
+          Je te protègerai jusqu'à ma mort,<br/>et je t'aimerai aujourd'hui, demain,<br/>et le restant de ma vie.
+        </p>
+        <div style={{marginTop:28,padding:"16px 20px",borderLeft:"2px solid #1d4ed8",background:"rgba(29,78,216,.05)",borderRadius:"0 6px 6px 0"}}>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"clamp(14px,1.8vw,17px)",color:"#60a5fa",lineHeight:1.7}}>
+            « Ta présence suffit pour que je sois souriant.<br/>On se dispute, mais on s'aime — et je te choisis, toujours. »
+          </p>
+        </div>
+        <div style={{marginTop:20,textAlign:"right"}}>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#3b82f6",fontSize:15}}>— A ♡ N · 21.03.2025</span>
+        </div>
+      </div>
+
+      <FlashbackBlock/>
+
+      <HeartsBlock user={user}/>
+
+      <HomeCapsulesBlock user={user}/>
+
+      <div className="fade-up-d3">
+        <div style={{textAlign:"center",marginBottom:24}}><span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:"#334155"}}>Ensemble depuis</span></div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,flexWrap:"wrap"}}>
+          <Digit value={t.days} label="Jours"/><Sep/><Digit value={t.hours} label="Heures"/><Sep/><Digit value={t.minutes} label="Minutes"/><Sep/><Digit value={t.seconds} label="Secondes"/>
+        </div>
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",gap:16,margin:"56px 0 32px"}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Anniversaires à venir</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+      <div className="fade-up-d4" style={{display:"flex",flexDirection:"column",gap:8}}>
+        {anniversaries.map((ann,i)=>{
+          const prog=getProgress(ann),days=getDaysUntil(ann.date),isNext=i===0;
+          return (
+            <div key={ann.num} className="anniv-row" style={{background:isNext?"rgba(29,78,216,.06)":"rgba(13,27,42,.5)",border:isNext?"1px solid rgba(59,130,246,.25)":"1px solid rgba(15,42,74,.5)",borderRadius:10,padding:"16px 22px",display:"grid",gridTemplateColumns:"52px 1fr 80px 52px",alignItems:"center",gap:16}}>
+              <div style={{background:isNext?"rgba(29,78,216,.25)":"rgba(30,58,95,.3)",border:isNext?"1px solid #3b82f6":"1px solid #1e3a5f",borderRadius:6,padding:"4px 8px",textAlign:"center"}}>
+                <span style={{fontFamily:"'Space Mono',monospace",fontSize:12,color:isNext?"#93c5fd":"#475569",display:"block",lineHeight:1}}>M</span>
+                <span style={{fontFamily:"'Space Mono',monospace",fontSize:16,fontWeight:700,color:isNext?"#60a5fa":"#334155"}}>{ann.num}</span>
+              </div>
+              <div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:isNext?"#c7d9f5":"#94a3b8",marginBottom:8}}>{fmt(ann.date)}</div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div className="progress-bar-track" style={{flex:1}}><div className="progress-bar-fill" style={{width:`${prog}%`}}/></div>
+                  <span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:"#334155",minWidth:36}}>{prog.toFixed(0)}%</span>
+                </div>
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontFamily:"'Space Mono',monospace",fontSize:20,fontWeight:700,color:isNext?"#60a5fa":"#1e3a5f",textShadow:isNext?"0 0 12px rgba(96,165,250,.4)":"none"}}>{days}</div>
+                <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#334155"}}>jours</div>
+              </div>
+              <div style={{textAlign:"center"}}>{isNext&&<span style={{fontSize:18,filter:"drop-shadow(0 0 6px rgba(96,165,250,.6))"}}>✦</span>}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="fade-up-d5" style={{textAlign:"center",marginTop:20}}>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:2,color:"#1e3a5f"}}>✦ Le prochain anniversaire mensuel est mis en avant · Les passés sont retirés en fin de journée ✦</span>
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",gap:16,margin:"56px 0 32px"}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Notre Playlist</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+      <div className="fade-up-d5">
+        {loadingSongs&&<div style={{textAlign:"center",padding:"32px 0"}}><div style={{width:24,height:24,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>}
+        {!loadingSongs&&songs.length===0&&!showSongForm&&(
+          <div style={{textAlign:"center",padding:"32px 0"}}>
+            <div style={{fontSize:32,marginBottom:10,opacity:.3}}>🎵</div>
+            <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#334155",fontSize:18}}>{isAdmin?"Ajoutez vos premières chansons ♡":"La playlist arrive bientôt…"}</p>
+          </div>
+        )}
+        {!loadingSongs&&songs.length>0&&(
+          <div style={{display:"flex",gap:16,overflowX:"auto",paddingBottom:16,paddingTop:4,scrollbarWidth:"none"}}>
+            {songs.map((song,i)=>{
+              const grad=song.color!==undefined?GRADIENTS[song.color]:GRADIENTS[i%GRADIENTS.length];
+              const isPlaying=playingId===song.id;
+              return (
+                <div key={song.id} style={{minWidth:200,maxWidth:200,borderRadius:14,overflow:"hidden",background:"#0d1b2a",border:`1px solid ${isPlaying?"rgba(59,130,246,.5)":"#1e3a5f"}`,boxShadow:isPlaying?"0 0 30px rgba(59,130,246,.25)":"none",transition:"box-shadow .3s,border-color .3s",flexShrink:0,position:"relative"}}>
+                  <div onClick={()=>setPlayingId(isPlaying?null:song.id)} style={{height:200,background:grad,position:"relative",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                    <div style={{width:110,height:110,borderRadius:"50%",background:"radial-gradient(circle at 50%,#1a1a1a 28%,#2a2a2a 29%,#111 50%,#222 51%,#111 70%,#222 71%,#1a1a1a 100%)",boxShadow:"0 4px 20px rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",animation:isPlaying?"vinylSpin 3s linear infinite":"none"}}>
+                      <div style={{width:28,height:28,borderRadius:"50%",background:"radial-gradient(circle,#333 40%,#222 100%)",border:"2px solid #444"}}/>
+                    </div>
+                    <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)",display:"flex",alignItems:"center",justifyContent:"center",opacity:isPlaying?1:0,transition:"opacity .2s"}}
+                      onMouseEnter={e=>e.currentTarget.style.opacity=1}
+                      onMouseLeave={e=>{if(!isPlaying)e.currentTarget.style.opacity=0;}}
+                    >
+                      {isPlaying?(
+                        <div style={{display:"flex",alignItems:"flex-end",height:24,gap:2}}>
+                          <span className="eq-bar eq-bar-1" style={{height:14}}/><span className="eq-bar eq-bar-2" style={{height:20}}/><span className="eq-bar eq-bar-3" style={{height:10}}/>
+                        </div>
+                      ):(
+                        <div style={{width:0,height:0,borderStyle:"solid",borderWidth:"10px 0 10px 18px",borderColor:"transparent transparent transparent white",marginLeft:4}}/>
+                      )}
+                    </div>
+                    <div style={{position:"absolute",top:10,left:10,fontFamily:"'Space Mono',monospace",fontSize:10,color:"rgba(255,255,255,.5)"}}>{String(i+1).padStart(2,"0")}</div>
+                    {isAdmin&&<button onClick={e=>{e.stopPropagation();removeSong(song.id);}} className="btn-danger" style={{position:"absolute",top:8,right:8,padding:"3px 8px",fontSize:11}}>✕</button>}
+                  </div>
+                  <div style={{padding:"14px 14px 16px"}}>
+                    <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:"#e2e8f0",marginBottom:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{song.title}</div>
+                    <div style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#3b82f6",letterSpacing:1,marginBottom:song.why?10:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{song.artist}</div>
+                    {song.why&&<div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:13,color:"#475569",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{song.why}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {isAdmin&&!loadingSongs&&(
+          <div style={{marginTop:songs.length>0?20:0}}>
+            {!showSongForm?(
+              <div style={{textAlign:"center"}}><button className="btn-ghost" onClick={()=>setShowSongForm(true)} style={{fontSize:12,letterSpacing:2}}>+ Ajouter une chanson</button></div>
+            ):(
+              <div style={{background:"rgba(13,27,42,.8)",border:"1px solid #1e3a5f",borderRadius:12,padding:"24px"}}>
+                <div style={{marginBottom:14}}>
+                  <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Couleur de la pochette</label>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {GRADIENTS.map((g,idx)=><div key={idx} onClick={()=>setSongColor(idx)} style={{width:32,height:32,borderRadius:6,background:g,cursor:"pointer",border:songColor===idx?"2px solid #60a5fa":"2px solid transparent",transition:"border .15s"}}/>)}
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                  <div><label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:6}}>Titre *</label><input type="text" placeholder="ex: Die For You" value={songTitle} onChange={e=>setSongTitle(e.target.value)}/></div>
+                  <div><label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:6}}>Artiste *</label><input type="text" placeholder="ex: The Weeknd" value={songArtist} onChange={e=>setSongArtist(e.target.value)}/></div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:6}}>Pourquoi cette chanson ? (optionnel)</label>
+                  <input type="text" placeholder="ex: Notre chanson du premier soir…" value={songWhy} onChange={e=>setSongWhy(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addSong()}/>
+                </div>
+                {songError&&<p style={{color:"#f87171",fontSize:12,marginBottom:10,fontFamily:"'Outfit',sans-serif"}}>{songError}</p>}
+                <div style={{display:"flex",gap:10}}>
+                  <button className="btn-primary" onClick={addSong}>Ajouter ♪</button>
+                  <button className="btn-ghost" onClick={()=>{setShowSongForm(false);setSongTitle("");setSongArtist("");setSongWhy("");setSongError("");setSongColor(0);}}>Annuler</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AlbumPage({isAdmin}) {
+  const [photos,setPhotos]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [uploading,setUploading]=useState(false);
+  const [lightbox,setLightbox]=useState(null);
+  const [caption,setCaption]=useState("");
+  const [error,setError]=useState("");
+  const [showForm,setShowForm]=useState(false);
+  const [pendingFile,setPendingFile]=useState(null);
+  const [uploadProgress,setUploadProgress]=useState("");
+  const fileRef=useRef();
+
+  const loadPhotos=useCallback(async()=>{
+    setLoading(true);
+    setError("");
+    try{
+      await waitForFirebase();
+      const data=await fbCall('fbGetPhotos');
+      setPhotos(data);
+    } catch(e){
+      console.error("Photos Firebase error:",e);
+      setError("Impossible de charger les photos : "+(e.message||"erreur réseau"));
+    }
+    setLoading(false);
+  },[]);
+  useEffect(()=>{loadPhotos();},[loadPhotos]);
+
+  const handleFileSelect=(e)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    if(!file.type.startsWith("image/")){setError("Veuillez sélectionner une image.");return;}
+    setPendingFile(file);setShowForm(true);setError("");
+  };
+
+  const handleUpload=async()=>{
+    if(!pendingFile)return;
+    setUploading(true);setError("");setUploadProgress("Préparation…");
+    try{
+      await waitForFirebase();
+      setUploadProgress("Lecture du fichier…");
+      const base64=await fileToBase64(pendingFile);
+      const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      setUploadProgress("Envoi vers Firebase…");
+      const date=new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+      const url=await fbCall('fbUploadPhoto', id,base64,caption.trim(),date);
+      setPhotos(prev=>[{id,url,caption:caption.trim(),date},...prev]);
+      setCaption("");setPendingFile(null);setShowForm(false);
+    }catch(e){setError("Erreur : "+(e.message||"image trop lourde ?"));}
+    setUploading(false);setUploadProgress("");
+    if(fileRef.current)fileRef.current.value="";
+  };
+
+  const handleDelete=async(photo)=>{
+    await waitForFirebase();
+    await fbCall('fbDeletePhoto', photo.id);
+    setPhotos(prev=>prev.filter(p=>p.id!==photo.id));
+  };
+
+  return (
+    <div style={{position:"relative",zIndex:1,padding:"60px 24px 80px",maxWidth:1100,margin:"0 auto"}}>
+      <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
+        <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — NOTRE ALBUM — ◆</span>
+        <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(36px,5vw,60px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>Nos Souvenirs</h2>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}>
+          <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+          <span style={{color:"#1e3a5f",fontSize:10}}>♡</span>
+          <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+        </div>
+      </div>
+      {isAdmin&&(
+        <div className="fade-up-d1" style={{marginBottom:40}}>
+          {!showForm?(
+            <div onClick={()=>fileRef.current?.click()} style={{border:"2px dashed #1e3a5f",borderRadius:12,padding:"32px",textAlign:"center",cursor:"pointer",transition:"all .3s",background:"rgba(13,27,42,.3)"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#3b82f6";e.currentTarget.style.background="rgba(29,78,216,.05)";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e3a5f";e.currentTarget.style.background="rgba(13,27,42,.3)";}}
+            >
+              <div style={{fontSize:32,marginBottom:10}}>📷</div>
+              <p style={{fontFamily:"'Outfit',sans-serif",color:"#475569",fontSize:14,letterSpacing:1}}>Cliquez pour ajouter une photo</p>
+              <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFileSelect}/>
+            </div>
+          ):(
+            <div style={{background:"rgba(13,27,42,.8)",border:"1px solid #1e3a5f",borderRadius:12,padding:"24px"}}>
+              <p style={{fontFamily:"'Outfit',sans-serif",color:"#94a3b8",fontSize:13,marginBottom:12}}>📎 {pendingFile?.name}</p>
+              <input type="text" placeholder="Légende (optionnel)" value={caption} onChange={e=>setCaption(e.target.value)} style={{marginBottom:12}}/>
+              {error&&<p style={{color:"#f87171",fontSize:13,marginBottom:12,fontFamily:"'Outfit',sans-serif"}}>{error}</p>}
+              {uploading&&<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><div style={{width:16,height:16,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",animation:"spin .8s linear infinite"}}/><span style={{fontFamily:"'Outfit',sans-serif",fontSize:12,color:"#475569"}}>{uploadProgress}</span></div>}
+              <div style={{display:"flex",gap:10}}>
+                <button className="btn-primary" onClick={handleUpload} disabled={uploading}>{uploading?"Envoi…":"Ajouter la photo"}</button>
+                <button className="btn-ghost" onClick={()=>{setShowForm(false);setPendingFile(null);setCaption("");setUploading(false);setUploadProgress("");setError("");}}>Annuler</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {!loading&&photos.length>0&&<div style={{marginBottom:24,display:"flex",alignItems:"center",gap:10}}><span style={{fontFamily:"'Space Mono',monospace",color:"#1d4ed8",fontSize:12}}>{photos.length} photo{photos.length>1?"s":""}</span><div style={{flex:1,height:1,background:"#0f2a4a"}}/></div>}
+      {loading&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{width:32,height:32,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/><p style={{marginTop:16,color:"#334155",fontFamily:"'Outfit',sans-serif",fontSize:13}}>Chargement depuis Firebase…</p></div>}
+      {!loading&&error&&<div style={{textAlign:"center",padding:"40px 0"}}><p style={{fontFamily:"'Outfit',sans-serif",fontSize:13,color:"#f87171",marginBottom:16}}>{error}</p><button className="btn-ghost" onClick={loadPhotos}>Réessayer</button></div>}
+      {!loading&&!error&&photos.length===0&&<div style={{textAlign:"center",padding:"80px 0"}}><div style={{fontSize:48,marginBottom:16,opacity:.3}}>🖼️</div><p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:"#334155",fontStyle:"italic"}}>{isAdmin?"Aucune photo encore — ajoutez vos premiers souvenirs ♡":"L'album se remplit bientôt…"}</p></div>}
+      {!loading&&photos.length>0&&(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>
+          {photos.map((photo,i)=>(
+            <div key={photo.id} className="photo-card fade-up" style={{animationDelay:`${i*.05}s`}} onClick={()=>setLightbox(photo)}>
+              <img src={photo.url} alt={photo.caption||"souvenir"} loading="lazy"/>
+              <div className="overlay">
+                <div style={{flex:1}}>
+                  {photo.caption&&<p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:14,color:"#e2e8f0",marginBottom:4}}>{photo.caption}</p>}
+                  <p style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#475569",letterSpacing:1}}>{photo.date}</p>
+                </div>
+                {isAdmin&&<button className="btn-danger" onClick={e=>{e.stopPropagation();handleDelete(photo);}}>✕</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {lightbox&&(
+        <div className="lightbox" onClick={()=>setLightbox(null)}>
+          <div style={{position:"relative"}}>
+            <img src={lightbox.url} alt={lightbox.caption} onClick={e=>e.stopPropagation()}/>
+            {lightbox.caption&&<div style={{textAlign:"center",marginTop:16,fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:18,color:"#94a3b8"}}>{lightbox.caption}</div>}
+            <button onClick={()=>setLightbox(null)} style={{position:"absolute",top:-12,right:-12,background:"#0d1b2a",border:"1px solid #1e3a5f",color:"#94a3b8",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoginModal({onClose,onLogin}) {
+  const [pass,setPass]=useState("");const [err,setErr]=useState("");
+  const submit=()=>{if(pass===ADMIN_PASS){onLogin();onClose();}else{setErr("Mot de passe incorrect.");}};
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(160deg,#0d1b2a,#081423)",border:"1px solid #1e3a5f",borderRadius:14,padding:"40px 36px",width:"min(360px,90vw)",position:"relative"}}>
+        <div className="corner-bracket tl"/><div className="corner-bracket tr"/><div className="corner-bracket bl"/><div className="corner-bracket br"/>
+        <h3 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:28,color:"#e2e8f0",textAlign:"center",marginBottom:6}}>Espace Admin</h3>
+        <p style={{fontFamily:"'Outfit',sans-serif",fontSize:12,color:"#334155",textAlign:"center",letterSpacing:2,marginBottom:28}}>ACCÈS SÉCURISÉ</p>
+        <label style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:2,color:"#475569",textTransform:"uppercase",display:"block",marginBottom:8}}>Mot de passe</label>
+        <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••••••" autoFocus style={{marginBottom:16}}/>
+        {err&&<p style={{color:"#f87171",fontSize:12,marginBottom:12,fontFamily:"'Outfit',sans-serif"}}>{err}</p>}
+        <div style={{display:"flex",gap:10}}>
+          <button className="btn-primary" onClick={submit} style={{flex:1}}>Entrer</button>
+          <button className="btn-ghost" onClick={onClose}>Annuler</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SiteGate({onUnlock}) {
+  const [pass,setPass]=useState("");const [err,setErr]=useState(false);const [shake,setShake]=useState(false);
+  const submit=()=>{
+    const p=pass.toLowerCase().trim();
+    if(p===PASS_LUI){onUnlock("lui");}
+    else if(p===PASS_ELLE){onUnlock("elle");}
+    else{setErr(true);setShake(true);setTimeout(()=>setShake(false),500);}
+  };
+  return (
+    <div style={{minHeight:"100vh",background:"#020c1b",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+      <G/><BgDecor/>
+      {["10%","85%","50%","25%","70%"].map((left,i)=>(
+        <div key={i} style={{position:"absolute",left,top:`${15+i*18}%`,fontSize:[14,10,18,12,8][i],color:"#1e3a5f",opacity:.5,animation:`float ${3+i}s ease-in-out infinite`,animationDelay:`${i*.6}s`,userSelect:"none",pointerEvents:"none"}}>♡</div>
+      ))}
+      <div style={{position:"relative",zIndex:1,width:"min(400px,90vw)",animation:shake?"shakeX .5s ease":"fadeUp .6s ease both"}}>
+        <div style={{background:"linear-gradient(160deg,#0d1b2a,#081423)",border:`1px solid ${err?"rgba(239,68,68,.4)":"#1e3a5f"}`,borderRadius:16,padding:"48px 40px",boxShadow:err?"0 0 40px rgba(239,68,68,.1)":"0 0 60px rgba(29,78,216,.12)",transition:"border-color .3s,box-shadow .3s",position:"relative"}}>
+          <div className="corner-bracket tl"/><div className="corner-bracket tr"/><div className="corner-bracket bl"/><div className="corner-bracket br"/>
+          <div style={{textAlign:"center",marginBottom:24}}><div className="float-anim" style={{fontSize:40,filter:"drop-shadow(0 0 12px rgba(96,165,250,.4))"}}>💙</div></div>
+          <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:32,fontWeight:300,color:"#e2e8f0",textAlign:"center",marginBottom:6,letterSpacing:-.5}}>Notre Histoire</h1>
+          <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:"#334155",textAlign:"center",marginBottom:36}}>Espace privé · A &amp; N</p>
+          <label style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Mot de passe</label>
+          <input type="password" value={pass} onChange={e=>{setPass(e.target.value);setErr(false);}} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••••" autoFocus style={{marginBottom:6,borderColor:err?"rgba(239,68,68,.5)":undefined}}/>
+          <div style={{height:22,marginBottom:14}}>{err&&<p style={{fontFamily:"'Outfit',sans-serif",fontSize:12,color:"#f87171"}}>Mot de passe incorrect ✕</p>}</div>
+          <button className="btn-primary" onClick={submit} style={{width:"100%",padding:"13px",fontSize:12,letterSpacing:2}}>Entrer ♡</button>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:13,color:"#1e3a5f",textAlign:"center",marginTop:20}}>Réservé à nous deux — 21.03.2025</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [user,setUser]=useState(null);
+  const [page,setPage]=useState("home");
+  const [lastVisit,setLastVisit]=useState(null);
+  const isAdmin = user==="lui";
+
+  const handleUnlock = (profile) => {
+    const prev = getLastVisit(profile);
+    setLastVisit(prev);
+    saveVisit(profile);
+    setUser(profile);
+    // Demande la permission de notifications et enregistre le token FCM
+    if (typeof window.fbInitMessaging === "function") {
+      window.fbInitMessaging(profile);
+    }
+  };
+
+  if(!user)return <SiteGate onUnlock={handleUnlock}/>;
+
+  const meta = USER_META[user];
+
+  return (
+    <div style={{minHeight:"100vh",background:"#020c1b",position:"relative"}}>
+      <G/><BgDecor/>
+      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(2,12,27,.85)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(30,58,95,.4)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setPage("home")}>
+          <div style={{width:8,height:8,background:"#3b82f6",borderRadius:"50%",boxShadow:"0 0 8px #3b82f6"}}/>
+          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#93c5fd",letterSpacing:2}}>Notre Histoire</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:24}}>
+          <span className={`nav-link ${page==="home"?"active":""}`} onClick={()=>setPage("home")}>Accueil</span>
+          <span className={`nav-link ${page==="album"?"active":""}`} onClick={()=>setPage("album")}>Album</span>
+          <span className={`nav-link ${page==="capsule"?"active":""}`} onClick={()=>setPage("capsule")}>Capsule ✦</span>
+          {/* User badge */}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,borderLeft:"1px solid rgba(30,58,95,.5)",paddingLeft:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:13}}>{meta.emoji}</span>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:2,color:isAdmin?"#60a5fa":"#f9a8d4",fontWeight:500}}>{meta.label}{isAdmin?" · Admin":""}</span>
+            </div>
+            {lastVisit && (
+              <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#334155",letterSpacing:1}}>dernière visite {fmtVisit(lastVisit)}</span>
+            )}
+          </div>
+        </div>
+      </nav>
+      {page==="home"&&<HomePage isAdmin={isAdmin} user={user}/>}
+      {page==="album"&&<AlbumPage isAdmin={isAdmin}/>}
+      {page==="capsule"&&<CapsulePage user={user}/>}
+      <footer style={{borderTop:"1px solid rgba(30,58,95,.3)",padding:"20px 32px",display:"flex",alignItems:"center",justifyContent:"center",gap:20,position:"relative",zIndex:1}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#0f2a4a)"}}/>
+        <span style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#1e3a5f",fontSize:13}}>♡ Pour toujours ♡</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#0f2a4a)"}}/>
+      </footer>
+    </div>
+  );
+}
+
+// ─── Capsule Temporelle ───────────────────────────────────────────────────────
+function CapsuleCard({msg, user}) {
+  // Parse "YYYY-MM-DD" as LOCAL midnight to avoid UTC offset issues
+  const parseLocalDate = (str) => {
+    if (!str) return new Date(0);
+    // "YYYY-MM-DD" → local time
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const [y,mo,d] = str.split("-").map(Number);
+      return new Date(y, mo-1, d, 0, 0, 0, 0);
+    }
+    return new Date(str);
+  };
+
+  const unlockTs = parseLocalDate(msg.unlockDate).getTime();
+
+  // Reactive: re-check every second so blur disappears the moment date is reached
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (now >= unlockTs) return; // already unlocked, no need for interval
+    const id = setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (n >= unlockTs) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [unlockTs]);
+
+  const unlocked = now >= unlockTs;
+  const authorLabel = msg.author === "lui" ? "Lui 💙" : "Elle 🌸";
+  const fmt = (ts) => new Date(ts).toLocaleDateString("fr-FR", {day:"numeric",month:"long",year:"numeric"});
+
+  // Countdown values
+  const diffMs = Math.max(0, unlockTs - now);
+  const cntD = Math.floor(diffMs/86400000);
+  const cntH = Math.floor(diffMs/3600000)%24;
+  const cntM = Math.floor(diffMs/60000)%60;
+  const cntS = Math.floor(diffMs/1000)%60;
+
+  return (
+    <div style={{background:"rgba(13,27,42,.8)",border:`1px solid ${unlocked?"rgba(96,165,250,.35)":"rgba(30,58,95,.5)"}`,borderRadius:12,padding:"24px",position:"relative",transition:"border-color .6s"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>{unlocked ? "💌" : "🔒"}</span>
+          <div>
+            <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:msg.author==="lui"?"#3b82f6":"#f472b6",marginBottom:2}}>{authorLabel}</div>
+            <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#334155"}}>
+              {unlocked ? `Débloqué le ${fmt(unlockTs)}` : `Se dévoile le ${fmt(unlockTs)}`}
+            </div>
+          </div>
+        </div>
+        {unlocked
+          ? <span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:"#22c55e",letterSpacing:1}}>✓ OUVERT</span>
+          : <span style={{fontFamily:"'Space Mono',monospace",fontSize:11,color:"#334155",letterSpacing:1}}>
+              {cntD > 0 && `${cntD}j `}{String(cntH).padStart(2,"0")}:{String(cntM).padStart(2,"0")}:{String(cntS).padStart(2,"0")}
+            </span>
+        }
+      </div>
+      {/* Message body */}
+      <div style={{position:"relative",borderRadius:8,overflow:"hidden"}}>
+        <p style={{
+          fontFamily:"'Cormorant Garamond',serif",
+          fontStyle:"italic",
+          fontSize:17,
+          lineHeight:1.8,
+          color:"#cbd5e1",
+          padding:"16px 20px",
+          background:"rgba(8,20,35,.6)",
+          borderRadius:8,
+          border:"1px solid rgba(30,58,95,.3)",
+          margin:0,
+          filter: unlocked ? "none" : "blur(12px)",
+          userSelect: unlocked ? "auto" : "none",
+          pointerEvents: unlocked ? "auto" : "none",
+          transition:"filter .8s ease",
+          minHeight:60,
+        }}>{msg.text}</p>
+        {!unlocked && (
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:8,pointerEvents:"none"}}>
+            <div style={{fontSize:28,marginBottom:4}}>🔒</div>
+            <span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#475569",letterSpacing:2}}>Message scellé</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CapsulePage({user}) {
+  const [messages,setMessages]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [text,setText]=useState("");
+  const [unlockDate,setUnlockDate]=useState("");
+  const [sending,setSending]=useState(false);
+  const [showForm,setShowForm]=useState(false);
+  const [err,setErr]=useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotMessages((data) => {
+        setMessages(data);
+        setLoading(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  const minDate = new Date(); minDate.setDate(minDate.getDate()+1);
+  const minStr = minDate.toISOString().split("T")[0];
+
+  const sendMessage = async () => {
+    if (!text.trim()) { setErr("Écris ton message ♡"); return; }
+    if (!unlockDate) { setErr("Choisis une date de dévoilement."); return; }
+    setSending(true); setErr("");
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    try {
+      await waitForFirebase();
+      await fbCall('fbAddMessage', id, text.trim(), unlockDate, user);
+      setMessages(prev => [{id, text:text.trim(), unlockDate, author:user, createdAt:Date.now()}, ...prev]);
+      setText(""); setUnlockDate(""); setShowForm(false);
+    } catch(e) { setErr("Erreur lors de l'envoi : "+e.message); }
+    setSending(false);
+  };
+
+  // Separate messages: those for you vs those from you
+  const forMe = messages.filter(m => m.author !== user);
+  const fromMe = messages.filter(m => m.author === user);
+
+  return (
+    <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
+      {/* Header */}
+      <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
+        <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — CAPSULE TEMPORELLE — ◆</span>
+        <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(34px,5vw,56px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>Messages Cachés</h2>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#475569",fontSize:16,marginTop:8}}>
+          Des mots scellés dans le temps, qui se dévoilent au moment choisi.
+        </p>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}>
+          <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+          <span style={{color:"#1e3a5f",fontSize:10}}>♡</span>
+          <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+        </div>
+      </div>
+
+      {/* Bouton préparer */}
+      <div className="fade-up-d1" style={{marginBottom:40}}>
+        {!showForm ? (
+          <div style={{textAlign:"center"}}>
+            <button className="btn-primary" onClick={()=>setShowForm(true)} style={{padding:"14px 32px",fontSize:12,letterSpacing:2}}>
+              {user==="lui" ? "🎁 Préparer une surprise" : "💌 Envoyer un message"}
+            </button>
+          </div>
+        ) : (
+          <div style={{background:"rgba(13,27,42,.9)",border:"1px solid rgba(59,130,246,.3)",borderRadius:14,padding:"28px",boxShadow:"0 0 40px rgba(59,130,246,.08)"}}>
+            <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+            <h3 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:"#e2e8f0",marginBottom:4}}>
+              {user==="lui" ? "Une surprise pour elle 💙" : "Un message pour lui 🌸"}
+            </h3>
+            <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#334155",letterSpacing:1,marginBottom:20}}>Le message sera flouté jusqu'à la date choisie.</p>
+            <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Ton message *</label>
+            <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Écris ce que tu veux lui dire…" rows={5} style={{marginBottom:16,resize:"vertical"}}/>
+            <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Se dévoile le *</label>
+            <input type="date" value={unlockDate} min={minStr} onChange={e=>setUnlockDate(e.target.value)} style={{marginBottom:16,width:"auto"}}/>
+            {err&&<p style={{color:"#f87171",fontSize:12,marginBottom:12,fontFamily:"'Outfit',sans-serif"}}>{err}</p>}
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn-primary" onClick={sendMessage} disabled={sending}>{sending?"Envoi…":"Sceller le message 🔒"}</button>
+              <button className="btn-ghost" onClick={()=>{setShowForm(false);setText("");setUnlockDate("");setErr("");}}>Annuler</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Messages reçus */}
+      {loading && <div style={{textAlign:"center",padding:"48px 0"}}><div style={{width:32,height:32,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>}
+      {!loading && (
+        <>
+          {forMe.length > 0 && (
+            <div style={{marginBottom:40}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+                <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Messages pour toi</span>
+                <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                {forMe.map(m=><CapsuleCard key={m.id} msg={m} user={user}/>)}
+              </div>
+            </div>
+          )}
+          {fromMe.length > 0 && (
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+                <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Tes messages envoyés</span>
+                <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                {fromMe.map(m=><CapsuleCard key={m.id} msg={m} user={user}/>)}
+              </div>
+            </div>
+          )}
+          {messages.length===0 && (
+            <div style={{textAlign:"center",padding:"80px 0"}}>
+              <div style={{fontSize:52,marginBottom:16,opacity:.3}}>🔒</div>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:"#334155",fontStyle:"italic"}}>La capsule est vide pour l'instant…</p>
+              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:12,color:"#1e3a5f",marginTop:8,letterSpacing:2}}>Sois le premier à sceller un message ♡</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+// Attend que Firebase soit init, puis transforme manuellement le script JSX
+(function() {
+  function runBabel() {
+    if (typeof Babel === "undefined" || typeof firebase === "undefined") {
+      return setTimeout(runBabel, 30);
+    }
+    // S'assurer que Firebase est bien init
+    if (!window.fbGetHearts) {
+      return setTimeout(runBabel, 30);
+    }
+    // Transformer le script JSX en JS et l'exécuter
+    var pending = document.getElementById("main-babel-script");
+    if (!pending) return;
+    try {
+      var src = pending.textContent || pending.innerHTML;
+      var transformed = Babel.transform(src, { presets: ["react"] }).code;
+      var s = document.createElement("script");
+      s.textContent = transformed;
+      document.body.appendChild(s);
+    } catch(e) {
+      console.error("Babel transform error:", e);
+    }
+  }
+  runBabel();
+})();
+</script>
+</body>
+</html>
