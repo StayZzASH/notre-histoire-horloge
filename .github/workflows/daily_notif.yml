@@ -1,0 +1,29 @@
+name: 🕙 Notification Quotidienne
+
+on:
+  schedule:
+    # Toutes les 30 min → traite la file (cœurs, messages scellés, déverrouillages)
+    - cron: '*/30 * * * *'
+    # Message quotidien envoyé à 9h UTC (11h Paris en été)
+    - cron: '0 9 * * *'
+  workflow_dispatch: # Permet de lancer le test manuellement
+
+jobs:
+  send-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Récupération du code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Installation des dépendances
+        run: npm install firebase-admin
+
+      - name: 🚀 Envoi de la notification
+        env:
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+        run: node notify.js
