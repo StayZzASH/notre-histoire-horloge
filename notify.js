@@ -171,16 +171,47 @@ async function checkMessageUnlocks(tokensByUser) {
   }
 }
 
-// ── 3. Message d'amour quotidien ──────────────────────────────────────────────
+// ── 3. Message d'amour quotidien (+ anniversaires le 21) ─────────────────────
 async function sendDailyMessage(tokensByUser) {
-  const day     = getDayCount();
-  const message = LOVE_MESSAGES[day % LOVE_MESSAGES.length];
-  const title   = `Jour ${day} ensemble ♡`;
+  const now   = new Date();
+  const day   = now.getDate();   // 1-31
+  const month = now.getMonth();  // 0-indexé, mars = 2
 
-  console.log(`Message quotidien → "${title}"`);
-
-  // Envoi à tous les tokens (lui + elle)
+  // Tous les tokens (lui + elle) pour les notifs communes
   const allTokens = [...(tokensByUser.lui || []), ...(tokensByUser.elle || [])];
+
+  // ── Cas 1 : 21 mars → anniversaire de l'année ──────────────────────────────
+  if (day === 21 && month === 2) {
+    const years  = now.getFullYear() - 2025; // 0 la 1ère année, 1 la 2ème…
+    const months = Math.round((Date.now() - START_DATE.getTime()) / (30.44 * 24 * 3600 * 1000));
+    const title  = years >= 1
+      ? `🎂 ${years} an${years > 1 ? "s" : ""} ensemble aujourd'hui ! 🎂`
+      : `🎉 Notre premier anniversaire ensemble ! 🎉`;
+    const body   = years >= 1
+      ? `Ça fait ${years} an${years > 1 ? "s" : ""} et ${months} mois qu'on s'est rencontrés — et c'est encore mieux chaque jour. Je t'aime. ♡`
+      : `Un an que tout a commencé, le 21 mars 2025. Merci d'être là, pour toujours. 🥂♡`;
+    console.log(`🎂 Anniversaire annuel → "${title}"`);
+    await sendToTokens(allTokens, title, body, "anniv_annuel");
+    return;
+  }
+
+  // ── Cas 2 : autre 21 → mois-niversaire ────────────────────────────────────
+  if (day === 21) {
+    const moisEcoules = Math.round((Date.now() - START_DATE.getTime()) / (30.44 * 24 * 3600 * 1000));
+    const nomsMois = ["janvier","février","mars","avril","mai","juin",
+                      "juillet","août","septembre","octobre","novembre","décembre"];
+    const title = `🥂 ${moisEcoules} mois ensemble ! 🥂`;
+    const body  = `Déjà ${moisEcoules} mois depuis le 21 mars 2025 — et chaque journée est une chance de t'aimer encore plus fort. ♡`;
+    console.log(`🥂 Mois-niversaire (${moisEcoules} mois) → "${title}"`);
+    await sendToTokens(allTokens, title, body, "anniv_mensuel");
+    return;
+  }
+
+  // ── Cas 3 : jour normal → message d'amour ─────────────────────────────────
+  const dayCount = getDayCount();
+  const message  = LOVE_MESSAGES[dayCount % LOVE_MESSAGES.length];
+  const title    = `Jour ${dayCount} ensemble ♡`;
+  console.log(`Message quotidien → "${title}"`);
   await sendToTokens(allTokens, title, message, "daily");
 }
 
