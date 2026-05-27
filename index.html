@@ -133,6 +133,36 @@
           }).then(function() { return ref.get(); }).then(function(s){ return s.data(); });
         });
       };
+
+      // ── États d'humeur ─────────────────────────────────────────────────────
+      // Sauvegarde l'état du jour pour un utilisateur
+      window.fbSetEtat = function(user, humeur, energie) {
+        var today = new Date().toISOString().split("T")[0];
+        var id = user + "_" + today;
+        return _db.collection("etats").doc(id).set({
+          user: user, humeur: humeur, energie: energie,
+          date: today, updatedAt: Date.now()
+        }, { merge: true });
+      };
+      // Écoute temps réel des états des deux utilisateurs
+      window.fbOnSnapshotEtats = function(callback) {
+        return _db.collection("etats").orderBy("updatedAt", "desc")
+          .onSnapshot(function(snap) {
+            callback(snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }));
+          }, function(err){ console.error("onSnapshot etats:", err); });
+      };
+      // Récupère les 7 derniers jours d'un utilisateur
+      window.fbGetHistoriqueEtat = function(user) {
+        var cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 6);
+        var cutoffStr = cutoff.toISOString().split("T")[0];
+        return _db.collection("etats")
+          .where("user", "==", user)
+          .where("date", ">=", cutoffStr)
+          .orderBy("date", "desc")
+          .get()
+          .then(function(s){ return s.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); });
+      };
     })();
   </script>
   <style>body{margin:0;background:#020c1b}#root{min-height:100vh}</style>
@@ -288,6 +318,13 @@ const G = () => (
     .anniv-row:hover{background:rgba(30,58,95,.15)!important;border-color:#1e3a5f!important}
     .lightbox{position:fixed;inset:0;background:rgba(2,12,27,.96);display:flex;align-items:center;justify-content:center;z-index:2000;animation:fadeUp .2s ease}
     .lightbox img{max-width:90vw;max-height:85vh;object-fit:contain;border-radius:4px;box-shadow:0 0 60px rgba(0,0,0,.8)}
+    .video-bg-container{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:none;overflow:hidden}
+    .video-bg-container::after{content:'';position:absolute;inset:0;background:rgba(2,12,27,.55);pointer-events:none}
+    .video-bg-container video{width:100%;height:100%;object-fit:cover;display:block}
+    body.anniv-bg .video-bg-container{display:block}
+    body.anniv-bg{background:#020c1b}
+    @keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+    .confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;animation:confettiFall linear forwards;pointer-events:none;z-index:9999}
   `}</style>
 );
 
@@ -1120,7 +1157,37 @@ function App() {
   const [user,setUser]=useState(null);
   const [page,setPage]=useState("home");
   const [lastVisit,setLastVisit]=useState(null);
+  const [isAnniv,setIsAnniv]=useState(false);
   const isAdmin = user==="lui";
+
+  // Détection du 21 : mode anniversaire
+  useEffect(() => {
+    const today = new Date();
+    const day   = today.getDate();
+    const month = today.getMonth(); // 0-indexé, mars = 2
+    if (day === 21) {
+      document.body.classList.add("anniv-bg");
+      setIsAnniv(true);
+      // Confettis festifs
+      const colors = ["#f9a8d4","#93c5fd","#fcd34d","#6ee7b7","#c4b5fd"];
+      for (let i = 0; i < 60; i++) {
+        const el = document.createElement("div");
+        el.className = "confetti-piece";
+        el.style.left = Math.random() * 100 + "vw";
+        el.style.top  = "-10px";
+        el.style.background = colors[Math.floor(Math.random() * colors.length)];
+        el.style.animationDuration  = (2.5 + Math.random() * 3) + "s";
+        el.style.animationDelay     = (Math.random() * 4) + "s";
+        el.style.borderRadius       = Math.random() > .5 ? "50%" : "2px";
+        document.body.appendChild(el);
+        el.addEventListener("animationend", () => el.remove());
+      }
+    } else {
+      document.body.classList.remove("anniv-bg");
+      setIsAnniv(false);
+    }
+    return () => { document.body.classList.remove("anniv-bg"); };
+  }, []);
 
   const handleUnlock = (profile) => {
     const prev = getLastVisit(profile);
@@ -1134,19 +1201,32 @@ function App() {
   if(!user)return <SiteGate onUnlock={handleUnlock}/>;
 
   const meta = USER_META[user];
+  const today = new Date();
+  const isAnnivAnnuel = today.getDate() === 21 && today.getMonth() === 2; // 21 mars
+  const navSubtitle = isAnniv
+    ? (isAnnivAnnuel ? "🎂 Joyeux Anniversaire 🎂" : "🎉 Jour de Fête 🎉")
+    : null;
 
   return (
     <div style={{minHeight:"100vh",background:"#020c1b",position:"relative"}}>
+      {/* Vidéo de fond anniversaire */}
+      <div className="video-bg-container">
+        <video src="anniv.mp4" autoPlay loop muted playsInline />
+      </div>
       <G/><BgDecor/>
       <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(2,12,27,.85)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(30,58,95,.4)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
         <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setPage("home")}>
-          <div style={{width:8,height:8,background:"#3b82f6",borderRadius:"50%",boxShadow:"0 0 8px #3b82f6"}}/>
-          <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#93c5fd",letterSpacing:2}}>Notre Histoire</span>
+          <div style={{width:8,height:8,background:isAnniv?"#fcd34d":"#3b82f6",borderRadius:"50%",boxShadow:isAnniv?"0 0 10px #fcd34d":"0 0 8px #3b82f6",transition:"all .5s"}}/>
+          <div style={{display:"flex",flexDirection:"column",gap:1}}>
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:isAnniv?"#fcd34d":"#93c5fd",letterSpacing:2,transition:"color .5s"}}>Notre Histoire</span>
+            {navSubtitle && <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,color:"#fcd34d",textTransform:"uppercase"}}>{navSubtitle}</span>}
+          </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:24}}>
           <span className={`nav-link ${page==="home"?"active":""}`} onClick={()=>setPage("home")}>Accueil</span>
           <span className={`nav-link ${page==="album"?"active":""}`} onClick={()=>setPage("album")}>Album</span>
           <span className={`nav-link ${page==="capsule"?"active":""}`} onClick={()=>setPage("capsule")}>Capsule ✦</span>
+          <span className={`nav-link ${page==="etat"?"active":""}`} onClick={()=>setPage("etat")}>État ♡</span>
           {/* User badge */}
           <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,borderLeft:"1px solid rgba(30,58,95,.5)",paddingLeft:16}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1162,6 +1242,7 @@ function App() {
       {page==="home"&&<HomePage isAdmin={isAdmin} user={user}/>}
       {page==="album"&&<AlbumPage isAdmin={isAdmin}/>}
       {page==="capsule"&&<CapsulePage user={user}/>}
+      {page==="etat"&&<EtatPage user={user}/>}
       <footer style={{borderTop:"1px solid rgba(30,58,95,.3)",padding:"20px 32px",display:"flex",alignItems:"center",justifyContent:"center",gap:20,position:"relative",zIndex:1}}>
         <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#0f2a4a)"}}/>
         <span style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#1e3a5f",fontSize:13}}>♡ Pour toujours ♡</span>
@@ -1260,6 +1341,264 @@ function CapsuleCard({msg, user}) {
   );
 }
 
+
+// ─── Page État ────────────────────────────────────────────────────────────────
+
+const HUMEURS = [
+  { emoji: "🥰", label: "Amoureux·se" },
+  { emoji: "😊", label: "Bien"        },
+  { emoji: "😌", label: "Tranquille"  },
+  { emoji: "😔", label: "Triste"      },
+  { emoji: "😩", label: "Épuisé·e"   },
+  { emoji: "😡", label: "Énervé·e"   },
+  { emoji: "😰", label: "Stressé·e"  },
+  { emoji: "🤒", label: "Malade"      },
+  { emoji: "😴", label: "Somnolent·e" },
+  { emoji: "🤩", label: "Euphorique"  },
+];
+
+const ENERGIES = [
+  { emoji: "🔋", label: "Plein·e"    },
+  { emoji: "⚡", label: "Dynamique"  },
+  { emoji: "😐", label: "Moyen·ne"   },
+  { emoji: "🥱", label: "Fatigué·e"  },
+  { emoji: "💤", label: "À plat"     },
+];
+
+function EtatCard({ etat, isSelf, label, color }) {
+  if (!etat) return (
+    <div style={{flex:1,background:"rgba(13,27,42,.5)",border:"1px solid rgba(30,58,95,.4)",borderRadius:14,padding:"28px 24px",textAlign:"center",minHeight:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}>
+      <div style={{fontSize:36,opacity:.2}}>💭</div>
+      <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#334155",lineHeight:1.6}}>
+        {isSelf ? "Tu n'as pas encore partagé ton état aujourd'hui…" : `${label} n'a pas encore partagé son état…`}
+      </p>
+    </div>
+  );
+
+  const humeurObj  = HUMEURS.find(h => h.emoji === etat.humeur)   || { emoji: etat.humeur,  label: "" };
+  const energieObj = ENERGIES.find(e => e.emoji === etat.energie) || { emoji: etat.energie, label: "" };
+  const isToday = etat.date === new Date().toISOString().split("T")[0];
+
+  return (
+    <div style={{flex:1,background:"rgba(13,27,42,.6)",border:`1px solid ${color === "blue" ? "rgba(59,130,246,.3)" : "rgba(244,114,182,.3)"}`,borderRadius:14,padding:"28px 24px",position:"relative",minHeight:200}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20}}>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color: color === "blue" ? "#60a5fa" : "#f472b6"}}>{label}</span>
+        {isToday
+          ? <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#22c55e",letterSpacing:1,marginLeft:"auto"}}>● Aujourd'hui</span>
+          : <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#475569",letterSpacing:1,marginLeft:"auto"}}>{etat.date}</span>
+        }
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{background:"rgba(8,20,35,.5)",borderRadius:10,padding:"14px 18px",border:"1px solid rgba(30,58,95,.3)"}}>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#334155",marginBottom:8}}>Comment je me sens</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:36}}>{humeurObj.emoji}</span>
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:"#e2e8f0",fontStyle:"italic"}}>{humeurObj.label}</span>
+          </div>
+        </div>
+        <div style={{background:"rgba(8,20,35,.5)",borderRadius:10,padding:"14px 18px",border:"1px solid rgba(30,58,95,.3)"}}>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:"#334155",marginBottom:8}}>Niveau d'énergie</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:36}}>{energieObj.emoji}</span>
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:"#e2e8f0",fontStyle:"italic"}}>{energieObj.label}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoriqueBar({ historique, user }) {
+  if (!historique.length) return null;
+  const last7 = historique.slice(0, 7).reverse();
+  const color = user === "lui" ? "#60a5fa" : "#f472b6";
+  return (
+    <div style={{marginTop:40}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Tes 7 derniers jours</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8}}>
+        {last7.map((e, i) => {
+          const isToday = e.date === new Date().toISOString().split("T")[0];
+          const d = new Date(e.date + "T00:00:00");
+          const dayLabel = d.toLocaleDateString("fr-FR", { weekday:"short" });
+          return (
+            <div key={e.id} style={{flex:"0 0 auto",display:"flex",flexDirection:"column",alignItems:"center",gap:6,background:isToday?"rgba(29,78,216,.1)":"rgba(13,27,42,.5)",border:`1px solid ${isToday ? "rgba(59,130,246,.3)" : "rgba(30,58,95,.3)"}`,borderRadius:10,padding:"12px 10px",minWidth:60}}>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:1,textTransform:"uppercase",color:isToday?color:"#334155"}}>{dayLabel}</span>
+              <span style={{fontSize:24}} title={HUMEURS.find(h=>h.emoji===e.humeur)?.label}>{e.humeur}</span>
+              <span style={{fontSize:16}} title={ENERGIES.find(en=>en.emoji===e.energie)?.label}>{e.energie}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function EtatPage({ user }) {
+  const [allEtats, setAllEtats]       = useState([]);
+  const [historique, setHistorique]   = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [showForm, setShowForm]       = useState(false);
+  const [selHumeur, setSelHumeur]     = useState(null);
+  const [selEnergie, setSelEnergie]   = useState(null);
+  const [saved, setSaved]             = useState(false);
+
+  const today = new Date().toISOString().split("T")[0];
+  const other = user === "lui" ? "elle" : "lui";
+
+  // Écoute temps réel de tous les états
+  useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotEtats((data) => {
+        setAllEtats(data);
+        setLoading(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  // Charger l'historique des 7 derniers jours de l'utilisateur courant
+  useEffect(() => {
+    waitForFirebase().then(async () => {
+      try {
+        const hist = await fbCall('fbGetHistoriqueEtat', user);
+        setHistorique(hist);
+      } catch(e) { console.error("Historique etat:", e); }
+    });
+  }, [user, saved]);
+
+  // État du jour : le plus récent de chaque utilisateur pour aujourd'hui
+  const myEtat    = allEtats.find(e => e.user === user    && e.date === today) || null;
+  const theirEtat = allEtats.find(e => e.user === other   && e.date === today) || null;
+
+  const myMeta    = USER_META[user];
+  const theirMeta = USER_META[other];
+
+  // Pré-remplir le formulaire si déjà renseigné aujourd'hui
+  useEffect(() => {
+    if (myEtat && !showForm) {
+      setSelHumeur(myEtat.humeur);
+      setSelEnergie(myEtat.energie);
+    }
+  }, [myEtat]);
+
+  const handleSave = async () => {
+    if (!selHumeur || !selEnergie) return;
+    setSaving(true);
+    try {
+      await waitForFirebase();
+      await fbCall('fbSetEtat', user, selHumeur, selEnergie);
+      // Notif à l'autre
+      const myName = user === "lui" ? "A" : "N";
+      await fbCall('fbQueueNotif', other, "etat",
+        `${myName} a mis à jour son état 💙`,
+        `${myName} se sent ${HUMEURS.find(h=>h.emoji===selHumeur)?.label} aujourd'hui`
+      );
+      setSaved(s => !s); // toggle pour relancer useEffect historique
+      setShowForm(false);
+    } catch(e) { console.error("Save etat:", e); }
+    setSaving(false);
+  };
+
+  const PickerRow = ({ items, selected, onSelect, label }) => (
+    <div style={{marginBottom:20}}>
+      <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",marginBottom:12}}>{label}</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {items.map(item => {
+          const isActive = selected === item.emoji;
+          return (
+            <button key={item.emoji} onClick={() => onSelect(item.emoji)}
+              style={{background: isActive ? "rgba(29,78,216,.25)" : "rgba(13,27,42,.6)",
+                border: `1px solid ${isActive ? "#3b82f6" : "rgba(30,58,95,.4)"}`,
+                borderRadius:10, padding:"10px 14px", cursor:"pointer",
+                display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+                transition:"all .15s", transform: isActive ? "scale(1.08)" : "scale(1)",
+                boxShadow: isActive ? "0 0 14px rgba(59,130,246,.3)" : "none",
+              }}>
+              <span style={{fontSize:26}}>{item.emoji}</span>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:1,color: isActive ? "#93c5fd" : "#475569",textTransform:"uppercase"}}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:780,margin:"0 auto"}}>
+
+      {/* ── En-tête ── */}
+      <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
+        <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — ÉTAT DU JOUR — ◆</span>
+        <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(34px,5vw,56px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>Comment on va ?</h2>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#475569",fontSize:16,marginTop:8}}>
+          Partage ton humeur du moment, pour que l'autre sache comment tu te sens.
+        </p>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}>
+          <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+          <span style={{color:"#1e3a5f",fontSize:10}}>♡</span>
+          <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+        </div>
+      </div>
+
+      {/* ── Spinner ── */}
+      {loading && (
+        <div style={{textAlign:"center",padding:"60px 0"}}>
+          <div style={{width:32,height:32,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/>
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          {/* ── Cartes côte à côte ── */}
+          <div className="fade-up-d1" style={{display:"flex",gap:16,marginBottom:32,flexWrap:"wrap"}}>
+            <EtatCard etat={myEtat}    isSelf={true}  label={`Moi ${myMeta.emoji}`}    color={user==="lui"?"blue":"pink"}  />
+            <EtatCard etat={theirEtat} isSelf={false} label={`${theirMeta.label} ${theirMeta.emoji}`} color={other==="lui"?"blue":"pink"} />
+          </div>
+
+          {/* ── Bouton mettre à jour ── */}
+          <div className="fade-up-d2" style={{textAlign:"center",marginBottom:40}}>
+            {!showForm ? (
+              <button className="btn-primary" onClick={()=>setShowForm(true)} style={{padding:"13px 32px",fontSize:12,letterSpacing:2}}>
+                {myEtat ? "✏️ Mettre à jour mon état" : "💭 Partager mon état du jour"}
+              </button>
+            ) : (
+              <div style={{background:"rgba(13,27,42,.9)",border:"1px solid rgba(59,130,246,.3)",borderRadius:14,padding:"28px",boxShadow:"0 0 40px rgba(59,130,246,.08)",textAlign:"left",maxWidth:540,margin:"0 auto"}}>
+                <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+                <h3 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:"#e2e8f0",marginBottom:4}}>
+                  Mon état du jour
+                </h3>
+                <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#334155",letterSpacing:1,marginBottom:24}}>
+                  {user==="lui" ? "A" : "N"} verra ton état en temps réel ♡
+                </p>
+                <PickerRow items={HUMEURS}  selected={selHumeur}  onSelect={setSelHumeur}  label="Comment tu te sens ?" />
+                <PickerRow items={ENERGIES} selected={selEnergie} onSelect={setSelEnergie} label="Ton niveau d'énergie ?" />
+                <div style={{display:"flex",gap:10,marginTop:8}}>
+                  <button className="btn-primary" onClick={handleSave} disabled={saving || !selHumeur || !selEnergie}
+                    style={{opacity: (!selHumeur || !selEnergie) ? .4 : 1}}>
+                    {saving ? "Envoi…" : "Enregistrer ♡"}
+                  </button>
+                  <button className="btn-ghost" onClick={()=>setShowForm(false)}>Annuler</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Historique ── */}
+          <div className="fade-up-d3">
+            <HistoriqueBar historique={historique} user={user} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function CapsulePage({user}) {
   const [messages,setMessages]=useState([]);
