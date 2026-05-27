@@ -49,7 +49,12 @@
           img.src = base64;
         });
       };
-      window.fbAddMessage     = function(id,text,unlockDate,author) { return _db.collection("messages_caches").doc(id).set({text:text,unlockDate:unlockDate,author:author,createdAt:Date.now()}); };
+      window.fbAddMessage     = function(id,text,unlockDate,author,photoUrl,photoCaption) {
+        var data = {text:text, unlockDate:unlockDate, author:author, createdAt:Date.now()};
+        if (photoUrl)     data.photoUrl     = photoUrl;
+        if (photoCaption) data.photoCaption = photoCaption;
+        return _db.collection("messages_caches").doc(id).set(data);
+      };
       window.fbGetMessages    = function() { return _db.collection("messages_caches").orderBy("createdAt","desc").get().then(function(s){return s.docs.map(function(d){return Object.assign({id:d.id},d.data());})}); };
       window.fbDeleteMessage  = function(id) { return _db.collection("messages_caches").doc(id).delete(); };
       window.fbGetHearts      = function() { return _db.collection("counters").doc("global_hearts").get().then(function(s){ return s.exists ? s.data() : {count_boeuf:0,count_poulet:0}; }); };
@@ -267,6 +272,8 @@ const G = () => (
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
     @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(400%)}}
     @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
     @keyframes flicker{0%,91%,95%,100%{opacity:1}92%,94%{opacity:.8}}
     @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
     @keyframes flashbackIn{from{opacity:0;transform:scale(1.08)}to{opacity:1;transform:scale(1)}}
@@ -1153,11 +1160,101 @@ function NotifButton({user}) {
   );
 }
 
+// ─── Rappel quotidien 15h ─────────────────────────────────────────────────────
+function useDailyReminder() {
+  // Retourne true si on est entre 15h00 et 23h59 ET que la bannière n'a pas été
+  // fermée aujourd'hui (clé localStorage : nh_reminder_dismissed_YYYY-MM-DD)
+  const todayKey = () => "nh_reminder_dismissed_" + new Date().toISOString().split("T")[0];
+  const [visible, setVisible] = useState(() => {
+    const h = new Date().getHours();
+    if (h < 15) return false;
+    try { return !localStorage.getItem(todayKey()); } catch { return true; }
+  });
+
+  // Recheck toutes les minutes (pour que ça s'allume à 15h00 si l'app est ouverte)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const h = new Date().getHours();
+      if (h < 15) { setVisible(false); return; }
+      try { setVisible(!localStorage.getItem(todayKey())); } catch { setVisible(true); }
+    }, 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const dismiss = () => {
+    try { localStorage.setItem(todayKey(), "1"); } catch {}
+    setVisible(false);
+  };
+
+  return { visible, dismiss };
+}
+
+function DailyReminderBanner({ user, onWriteClick }) {
+  const { visible, dismiss } = useDailyReminder();
+  if (!visible) return null;
+
+  const emoji  = user === "lui" ? "💙" : "🌸";
+  const prompt = user === "lui"
+    ? "Et si tu scellais un petit mot pour elle ce soir ?"
+    : "Et si tu scellais un petit mot pour lui ce soir ?";
+
+  return (
+    <div style={{
+      position:"fixed", bottom:80, left:"50%", transform:"translateX(-50%)",
+      zIndex:500, width:"min(480px,92vw)",
+      background:"linear-gradient(135deg,rgba(13,27,42,.97),rgba(8,20,35,.97))",
+      border:"1px solid rgba(59,130,246,.35)",
+      borderRadius:14, padding:"18px 20px",
+      boxShadow:"0 8px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(59,130,246,.1)",
+      animation:"slideDown .4s cubic-bezier(.22,1,.36,1) both",
+      display:"flex", alignItems:"center", gap:14,
+    }}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      {/* Icône pulsante */}
+      <div style={{
+        flexShrink:0, width:42, height:42, borderRadius:"50%",
+        background:"rgba(29,78,216,.2)", border:"1px solid rgba(59,130,246,.3)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:20, animation:"pulseGlow 3s ease-in-out infinite",
+      }}>{emoji}</div>
+
+      {/* Texte */}
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#3b82f6",marginBottom:3}}>
+          Rappel du soir ✦
+        </div>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#cbd5e1",lineHeight:1.45,margin:0}}>
+          {prompt}
+        </p>
+      </div>
+
+      {/* Actions */}
+      <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+        <button
+          className="btn-primary"
+          onClick={() => { dismiss(); onWriteClick(); }}
+          style={{padding:"6px 14px",fontSize:11,letterSpacing:1,whiteSpace:"nowrap"}}
+        >
+          Écrire 🔒
+        </button>
+        <button
+          className="btn-ghost"
+          onClick={dismiss}
+          style={{padding:"5px 12px",fontSize:10,letterSpacing:1,opacity:.6}}
+        >
+          Plus tard
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [user,setUser]=useState(null);
   const [page,setPage]=useState("home");
   const [lastVisit,setLastVisit]=useState(null);
   const [isAnniv,setIsAnniv]=useState(false);
+  const [openCapsuleForm, setOpenCapsuleForm] = useState(false);
   const isAdmin = user==="lui";
 
   // Détection du 21 : mode anniversaire
@@ -1227,6 +1324,7 @@ function App() {
           <span className={`nav-link ${page==="album"?"active":""}`} onClick={()=>setPage("album")}>Album</span>
           <span className={`nav-link ${page==="capsule"?"active":""}`} onClick={()=>setPage("capsule")}>Capsule ✦</span>
           <span className={`nav-link ${page==="etat"?"active":""}`} onClick={()=>setPage("etat")}>État ♡</span>
+          <span className={`nav-link ${page==="memoire"?"active":""}`} onClick={()=>setPage("memoire")}>Mémoire ✨</span>
           {/* User badge */}
           <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,borderLeft:"1px solid rgba(30,58,95,.5)",paddingLeft:16}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1241,8 +1339,10 @@ function App() {
       </nav>
       {page==="home"&&<HomePage isAdmin={isAdmin} user={user}/>}
       {page==="album"&&<AlbumPage isAdmin={isAdmin}/>}
-      {page==="capsule"&&<CapsulePage user={user}/>}
+      {page==="capsule"&&<CapsulePage user={user} autoOpenForm={openCapsuleForm} onFormOpened={()=>setOpenCapsuleForm(false)}/>}
       {page==="etat"&&<EtatPage user={user}/>}
+      {page==="memoire"&&<MemoirePage user={user}/>}
+      <DailyReminderBanner user={user} onWriteClick={()=>{ setPage("capsule"); setOpenCapsuleForm(true); }}/>
       <footer style={{borderTop:"1px solid rgba(30,58,95,.3)",padding:"20px 32px",display:"flex",alignItems:"center",justifyContent:"center",gap:20,position:"relative",zIndex:1}}>
         <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#0f2a4a)"}}/>
         <span style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#1e3a5f",fontSize:13}}>♡ Pour toujours ♡</span>
@@ -1337,6 +1437,31 @@ function CapsuleCard({msg, user}) {
           </div>
         )}
       </div>
+
+      {/* Photo attachée — visible seulement si déverrouillé */}
+      {unlocked && msg.photoUrl && (
+        <div style={{marginTop:14,borderRadius:8,overflow:"hidden",border:"1px solid rgba(59,130,246,.18)"}}>
+          <img
+            src={msg.photoUrl}
+            alt={msg.photoCaption||"souvenir"}
+            style={{width:"100%",maxHeight:280,objectFit:"cover",display:"block"}}
+          />
+          {msg.photoCaption && (
+            <div style={{padding:"10px 14px",background:"rgba(8,20,35,.7)"}}>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:14,color:"#94a3b8",margin:0,lineHeight:1.5}}>{msg.photoCaption}</p>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Photo floue si verrouillé */}
+      {!unlocked && msg.photoUrl && (
+        <div style={{marginTop:14,borderRadius:8,overflow:"hidden",border:"1px solid rgba(30,58,95,.3)",position:"relative"}}>
+          <img src={msg.photoUrl} alt="" style={{width:"100%",maxHeight:180,objectFit:"cover",display:"block",filter:"blur(14px)",transform:"scale(1.05)"}}/>
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(2,12,27,.4)"}}>
+            <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,color:"#334155"}}>📷 Photo scellée</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1600,7 +1725,7 @@ function EtatPage({ user }) {
   );
 }
 
-function CapsulePage({user}) {
+function CapsulePage({user, autoOpenForm, onFormOpened}) {
   const [messages,setMessages]=useState([]);
   const [loading,setLoading]=useState(true);
   const [text,setText]=useState("");
@@ -1608,7 +1733,16 @@ function CapsulePage({user}) {
   const [sending,setSending]=useState(false);
   const [showForm,setShowForm]=useState(false);
   const [err,setErr]=useState("");
-  const [activeTab,setActiveTab]=useState("capsule"); // "capsule" | "memoire"
+  // Photo attachée au message
+  const [photoFile,setPhotoFile]=useState(null);
+  const [photoPreview,setPhotoPreview]=useState(null);
+  const [photoCaption,setPhotoCaption]=useState("");
+  const photoRef=useRef();
+
+  // Auto-ouverture depuis le banner rappel
+  useEffect(()=>{
+    if(autoOpenForm){ setShowForm(true); if(onFormOpened) onFormOpened(); }
+  },[autoOpenForm]);
 
   useEffect(() => {
     setLoading(true);
@@ -1632,8 +1766,27 @@ function CapsulePage({user}) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
     try {
       await waitForFirebase();
-      await fbCall('fbAddMessage', id, text.trim(), unlockDate, user);
-      setMessages(prev => [{id, text:text.trim(), unlockDate, author:user, createdAt:Date.now()}, ...prev]);
+      // Compression photo si présente
+      let compressedUrl = null;
+      if (photoFile) {
+        compressedUrl = await new Promise((res,rej)=>{
+          const r=new FileReader();
+          r.onload=()=>{
+            const img=new Image();
+            img.onload=()=>{
+              const maxW=600; let w=img.width,h=img.height;
+              if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+              const c=document.createElement("canvas"); c.width=w; c.height=h;
+              c.getContext("2d").drawImage(img,0,0,w,h);
+              res(c.toDataURL("image/jpeg",0.72));
+            };
+            img.onerror=rej; img.src=r.result;
+          };
+          r.onerror=rej; r.readAsDataURL(photoFile);
+        });
+      }
+      await fbCall('fbAddMessage', id, text.trim(), unlockDate, user, compressedUrl, photoCaption.trim()||null);
+      setMessages(prev => [{id, text:text.trim(), unlockDate, author:user, createdAt:Date.now(), photoUrl:compressedUrl, photoCaption:photoCaption.trim()||null}, ...prev]);
       const other = user === "lui" ? "elle" : "lui";
       const myName = user === "lui" ? "A" : "N";
       const daysUntil = Math.ceil((new Date(unlockDate) - new Date()) / 86400000);
@@ -1642,45 +1795,28 @@ function CapsulePage({user}) {
         "Message scellé ✉",
         myName + " t'a scellé un message qui s'ouvre " + daysTxt + " ♡");
       setText(""); setUnlockDate(""); setShowForm(false);
+      setPhotoFile(null); setPhotoPreview(null); setPhotoCaption("");
+      if(photoRef.current) photoRef.current.value="";
     } catch(e) { setErr("Erreur lors de l'envoi : "+e.message); }
     setSending(false);
   };
 
-  // ── Logique de tri ──────────────────────────────────────────────────────────
-  // Mémoire = déverrouillé ET déverrouillé depuis > 7 jours
-  const SEPT_JOURS_MS = 7 * 24 * 60 * 60 * 1000;
-  const isMemoire = (msg) => {
-    const unlockTs = parseLocalDate(msg.unlockDate).getTime();
-    return Date.now() >= unlockTs && (Date.now() - unlockTs) > SEPT_JOURS_MS;
+  const handlePhotoSelect = (e) => {
+    const f=e.target.files?.[0];
+    if(!f||!f.type.startsWith("image/")) return;
+    setPhotoFile(f);
+    const reader=new FileReader();
+    reader.onload=ev=>setPhotoPreview(ev.target.result);
+    reader.readAsDataURL(f);
   };
 
-  const msgsCapsule = messages.filter(m => !isMemoire(m));
-  const msgsMemoire = messages.filter(m =>  isMemoire(m));
-  const visibleMsgs = activeTab === "capsule" ? msgsCapsule : msgsMemoire;
+  const removePhoto = () => { setPhotoFile(null); setPhotoPreview(null); setPhotoCaption(""); if(photoRef.current) photoRef.current.value=""; };
 
-  const forMe  = visibleMsgs.filter(m => m.author !== user);
-  const fromMe = visibleMsgs.filter(m => m.author === user);
+  // ── Liste unifiée (tous les messages sans séparation) ───────────────────────
+  const forMe  = messages.filter(m => m.author !== user);
+  const fromMe = messages.filter(m => m.author === user);
 
-  // ── Styles onglets ──────────────────────────────────────────────────────────
-  const tabStyle = (tab) => ({
-    background: "none",
-    border: "none",
-    borderBottom: `2px solid ${activeTab === tab ? "#3b82f6" : "transparent"}`,
-    color: activeTab === tab ? "#93c5fd" : "#475569",
-    cursor: "pointer",
-    fontFamily: "'Outfit',sans-serif",
-    fontSize: 12,
-    fontWeight: 500,
-    letterSpacing: 3,
-    textTransform: "uppercase",
-    padding: "10px 20px",
-    transition: "color .2s, border-color .2s",
-  });
-
-  // ── Messages d'absence poétiques ────────────────────────────────────────────
-  const emptyPoem = activeTab === "capsule"
-    ? { icon: "🔒", text: "Aucun message scellé pour l'instant…", sub: "Sois le premier à préparer une surprise ♡" }
-    : { icon: "🌙", text: "Aucun souvenir dans la mémoire…", sub: "Les messages dévoilés depuis plus d'une semaine apparaîtront ici ♡" };
+  const emptyPoem = { icon: "🔒", text: "Aucun message pour l'instant…", sub: "Sois le premier à préparer une surprise ♡" };
 
   return (
     <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
@@ -1718,6 +1854,36 @@ function CapsulePage({user}) {
             <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Écris ce que tu veux lui dire…" rows={5} style={{marginBottom:16,resize:"vertical"}}/>
             <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Se dévoile le *</label>
             <input type="date" value={unlockDate} min={minStr} onChange={e=>setUnlockDate(e.target.value)} style={{marginBottom:16,width:"auto"}}/>
+
+            {/* ── Photo optionnelle ── */}
+            <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Photo souvenir (optionnel)</label>
+            {!photoPreview ? (
+              <div
+                onClick={()=>photoRef.current?.click()}
+                style={{border:"1px dashed rgba(30,58,95,.7)",borderRadius:8,padding:"18px",textAlign:"center",cursor:"pointer",marginBottom:16,transition:"border-color .2s,background .2s",background:"rgba(8,20,35,.4)"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#3b82f6";e.currentTarget.style.background="rgba(29,78,216,.06)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(30,58,95,.7)";e.currentTarget.style.background="rgba(8,20,35,.4)";}}
+              >
+                <div style={{fontSize:24,marginBottom:6,opacity:.5}}>🖼️</div>
+                <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#475569",letterSpacing:1,margin:0}}>Clique pour joindre une photo de la galerie</p>
+                <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoSelect}/>
+              </div>
+            ) : (
+              <div style={{marginBottom:16,borderRadius:8,overflow:"hidden",border:"1px solid rgba(59,130,246,.25)",position:"relative"}}>
+                <img src={photoPreview} alt="aperçu" style={{width:"100%",maxHeight:180,objectFit:"cover",display:"block"}}/>
+                <div style={{padding:"10px 14px",background:"rgba(8,20,35,.8)"}}>
+                  <input
+                    type="text"
+                    value={photoCaption}
+                    onChange={e=>setPhotoCaption(e.target.value)}
+                    placeholder="Légende de la photo (optionnel)…"
+                    style={{marginBottom:0,fontSize:12}}
+                  />
+                </div>
+                <button onClick={removePhoto} style={{position:"absolute",top:8,right:8,background:"rgba(2,12,27,.8)",border:"1px solid rgba(239,68,68,.4)",color:"#f87171",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>✕ Retirer</button>
+              </div>
+            )}
+
             {err&&<p style={{color:"#f87171",fontSize:12,marginBottom:12,fontFamily:"'Outfit',sans-serif"}}>{err}</p>}
             <div style={{display:"flex",gap:10}}>
               <button className="btn-primary" onClick={sendMessage} disabled={sending}>{sending?"Envoi…":"Sceller le message 🔒"}</button>
@@ -1725,20 +1891,6 @@ function CapsulePage({user}) {
             </div>
           </div>
         )}
-      </div>
-
-      {/* ── Onglets ── */}
-      <div className="fade-up-d2" style={{display:"flex",borderBottom:"1px solid #0f2a4a",marginBottom:36,gap:4}}>
-        <button style={tabStyle("capsule")} onClick={()=>setActiveTab("capsule")}
-          onMouseEnter={e=>{if(activeTab!=="capsule")e.currentTarget.style.color="#93c5fd";}}
-          onMouseLeave={e=>{if(activeTab!=="capsule")e.currentTarget.style.color="#475569";}}>
-          Capsule ({msgsCapsule.length})
-        </button>
-        <button style={tabStyle("memoire")} onClick={()=>setActiveTab("memoire")}
-          onMouseEnter={e=>{if(activeTab!=="memoire")e.currentTarget.style.color="#93c5fd";}}
-          onMouseLeave={e=>{if(activeTab!=="memoire")e.currentTarget.style.color="#475569";}}>
-          Mémoire ({msgsMemoire.length})
-        </button>
       </div>
 
       {/* ── Contenu ── */}
@@ -1779,7 +1931,7 @@ function CapsulePage({user}) {
           )}
 
           {/* Onglet vide */}
-          {visibleMsgs.length === 0 && (
+          {forMe.length === 0 && fromMe.length === 0 && (
             <div style={{textAlign:"center",padding:"80px 0"}}>
               <div style={{fontSize:52,marginBottom:16,opacity:.3}}>{emptyPoem.icon}</div>
               <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#334155",fontStyle:"italic",lineHeight:1.7}}>{emptyPoem.text}</p>
@@ -1788,6 +1940,263 @@ function CapsulePage({user}) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+
+// ─── Mémoire · Loterie de la Nostalgie ───────────────────────────────────────
+function MemoirePage({user}) {
+  const LOTTO_KEY    = "nh_last_lotto_ts";
+  const COOLDOWN_MS  = 72 * 60 * 60 * 1000; // 72 h
+
+  const [messages,    setMessages]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [souvenir,    setSouvenir]    = useState(null);
+  const [lastTs,      setLastTs]      = useState(() => {
+    try { return parseInt(localStorage.getItem(LOTTO_KEY) || "0", 10) || 0; } catch { return 0; }
+  });
+  const [countdown,   setCountdown]   = useState("");
+  const [canPick,     setCanPick]     = useState(false);
+  const [picking,     setPicking]     = useState(false); // bref effet de tirage
+
+  // ── Chargement des messages ─────────────────────────────────────────────────
+  useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotMessages((data) => {
+        setMessages(data);
+        setLoading(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  // ── Compte-à-rebours + bouton actif/désactivé ──────────────────────────────
+  useEffect(() => {
+    const tick = () => {
+      const elapsed  = Date.now() - lastTs;
+      const remaining = COOLDOWN_MS - elapsed;
+      if (remaining <= 0) {
+        setCanPick(true);
+        setCountdown("");
+      } else {
+        setCanPick(false);
+        const totalSec = Math.ceil(remaining / 1000);
+        const d = Math.floor(totalSec / 86400);
+        const h = Math.floor((totalSec % 86400) / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        let label = "Prochaine pioche dans ";
+        if (d > 0) label += `${d}j `;
+        label += `${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m`;
+        if (d === 0) label += ` ${String(s).padStart(2,"0")}s`;
+        setCountdown(label);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lastTs]);
+
+  // ── Tirage au sort ──────────────────────────────────────────────────────────
+  const piocher = () => {
+    if (!canPick || picking) return;
+    const pool = messages.filter(m => parseLocalDate(m.unlockDate).getTime() <= Date.now());
+    if (!pool.length) return;
+
+    // Petit effet visuel : brève désactivation
+    setPicking(true);
+    setTimeout(() => {
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+      const ts = Date.now();
+      try { localStorage.setItem(LOTTO_KEY, String(ts)); } catch {}
+      setLastTs(ts);
+      setSouvenir(picked);
+      setPicking(false);
+    }, 600);
+  };
+
+  const unlockedCount = messages.filter(m => parseLocalDate(m.unlockDate).getTime() <= Date.now()).length;
+
+  // ── Formatage de date ───────────────────────────────────────────────────────
+  const fmtSouvenir = (unlockDate) => {
+    const d = parseLocalDate(unlockDate);
+    return d.toLocaleDateString("fr-FR", {day:"numeric", month:"long", year:"numeric"});
+  };
+
+  return (
+    <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
+
+      {/* ── En-tête ── */}
+      <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
+        <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — MÉMOIRE — ◆</span>
+        <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(34px,5vw,56px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>
+          Loterie de la Nostalgie
+        </h2>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#475569",fontSize:16,marginTop:8}}>
+          Laisse le hasard raviver un souvenir scellé…
+        </p>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}>
+          <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+          <span style={{color:"#1e3a5f",fontSize:10}}>✨</span>
+          <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+        </div>
+      </div>
+
+      {/* ── Zone centrale ── */}
+      <div className="fade-up-d1" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:32}}>
+
+        {/* Compteur de souvenirs disponibles */}
+        {!loading && (
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:"#334155",textAlign:"center"}}>
+            {unlockedCount === 0
+              ? "Aucun souvenir déverrouillé pour l'instant"
+              : `${unlockedCount} souvenir${unlockedCount > 1 ? "s" : ""} dans l'urne`
+            }
+          </div>
+        )}
+
+        {/* Bouton principal */}
+        <div style={{textAlign:"center"}}>
+          <button
+            className="btn-primary"
+            onClick={piocher}
+            disabled={!canPick || picking || loading || unlockedCount === 0}
+            style={{
+              padding:"16px 40px",
+              fontSize:13,
+              letterSpacing:2,
+              position:"relative",
+              overflow:"hidden",
+              transition:"all .3s",
+              opacity: (!canPick || unlockedCount === 0) ? .55 : 1,
+            }}
+          >
+            {picking ? "Tirage en cours…" : "✨ Piocher un souvenir"}
+          </button>
+
+          {!canPick && !picking && (
+            <p style={{marginTop:12,fontFamily:"'Space Mono',monospace",fontSize:11,color:"#334155",letterSpacing:1}}>
+              {countdown}
+            </p>
+          )}
+          {canPick && !picking && !souvenir && (
+            <p style={{marginTop:10,fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",letterSpacing:2}}>
+              ✦ Le hasard choisit pour vous ✦
+            </p>
+          )}
+        </div>
+
+        {/* ── Carte du souvenir pioché ── */}
+        {souvenir ? (
+          <div
+            className="fade-up"
+            style={{
+              width:"100%",
+              background:"rgba(13,27,42,.92)",
+              border:"1px solid rgba(96,165,250,.25)",
+              borderRadius:16,
+              padding:"32px 28px",
+              boxShadow:"0 0 60px rgba(59,130,246,.08)",
+              position:"relative",
+            }}
+          >
+            <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+
+            {/* Bandeau */}
+            <div style={{
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"center",
+              gap:8,
+              marginBottom:20,
+              paddingBottom:16,
+              borderBottom:"1px solid rgba(30,58,95,.5)",
+            }}>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:"#60a5fa"}}>
+                ✨ Souvenir scellé ♡
+              </span>
+            </div>
+
+            {/* Date d'origine */}
+            <div style={{
+              fontFamily:"'Space Mono',monospace",
+              fontSize:11,
+              color:"#334155",
+              letterSpacing:2,
+              textAlign:"center",
+              marginBottom:20,
+            }}>
+              {fmtSouvenir(souvenir.unlockDate)}
+            </div>
+
+            {/* Corps du message */}
+            <p style={{
+              fontFamily:"'Cormorant Garamond',serif",
+              fontStyle:"italic",
+              fontSize:"clamp(17px,2.5vw,22px)",
+              lineHeight:1.85,
+              color:"#cbd5e1",
+              textAlign:"center",
+              whiteSpace:"pre-wrap",
+              margin:0,
+              padding:"0 8px",
+            }}>
+              {souvenir.text}
+            </p>
+
+            {/* Photo souvenir si présente */}
+            {souvenir.photoUrl && (
+              <div style={{marginTop:20,borderRadius:10,overflow:"hidden",border:"1px solid rgba(59,130,246,.2)"}}>
+                <img src={souvenir.photoUrl} alt={souvenir.photoCaption||"souvenir"} style={{width:"100%",maxHeight:260,objectFit:"cover",display:"block"}}/>
+                {souvenir.photoCaption && (
+                  <div style={{padding:"10px 16px",background:"rgba(8,20,35,.8)"}}>
+                    <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:14,color:"#94a3b8",margin:0,lineHeight:1.5,textAlign:"center"}}>{souvenir.photoCaption}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Auteur */}
+            <div style={{
+              marginTop:20,
+              paddingTop:16,
+              borderTop:"1px solid rgba(30,58,95,.5)",
+              textAlign:"right",
+            }}>
+              <span style={{
+                fontFamily:"'Cormorant Garamond',serif",
+                fontStyle:"italic",
+                fontSize:14,
+                color: souvenir.author==="lui" ? "#3b82f6" : "#f472b6",
+              }}>
+                — {souvenir.author==="lui" ? "Lui 💙" : "Elle 🌸"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* État vide / premier tirage */
+          !loading && (
+            <div style={{
+              width:"100%",
+              background:"rgba(13,27,42,.5)",
+              border:"1px dashed rgba(30,58,95,.6)",
+              borderRadius:16,
+              padding:"60px 28px",
+              textAlign:"center",
+            }}>
+              <div style={{fontSize:48,marginBottom:16,opacity:.25}}>✨</div>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:18,color:"#334155",lineHeight:1.7}}>
+                Votre souvenir pioché apparaîtra ici…
+              </p>
+              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",letterSpacing:2,marginTop:10}}>
+                Un tirage toutes les 72 heures ♡
+              </p>
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }
