@@ -458,8 +458,15 @@ function HomeCapsulesBlock({user}) {
     return () => { if (unsub) unsub(); };
   }, []);
 
-  // Show only messages addressed TO the current user (sent by the other)
-  const forMe = messages.filter(m => m.author !== user);
+  // Show only messages addressed TO the current user (sent by the other),
+  // AND not yet in "Mémoire" (i.e. unlocked since less than 7 days, or still locked)
+  const SEPT_JOURS_MS = 7 * 24 * 60 * 60 * 1000;
+  const forMe = messages.filter(m => {
+    if (m.author === user) return false; // pas les miens
+    const unlockTs = parseLocalDate(m.unlockDate).getTime();
+    const estEnMemoire = Date.now() >= unlockTs && (Date.now() - unlockTs) > SEPT_JOURS_MS;
+    return !estEnMemoire;
+  });
   if (!loading && forMe.length === 0) return null;
 
   return (
@@ -1253,6 +1260,7 @@ function CapsuleCard({msg, user}) {
   );
 }
 
+
 function CapsulePage({user}) {
   const [messages,setMessages]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -1261,6 +1269,7 @@ function CapsulePage({user}) {
   const [sending,setSending]=useState(false);
   const [showForm,setShowForm]=useState(false);
   const [err,setErr]=useState("");
+  const [activeTab,setActiveTab]=useState("capsule"); // "capsule" | "memoire"
 
   useEffect(() => {
     setLoading(true);
@@ -1286,7 +1295,6 @@ function CapsulePage({user}) {
       await waitForFirebase();
       await fbCall('fbAddMessage', id, text.trim(), unlockDate, user);
       setMessages(prev => [{id, text:text.trim(), unlockDate, author:user, createdAt:Date.now()}, ...prev]);
-      // Notif à l'autre personne : message scellé créé
       const other = user === "lui" ? "elle" : "lui";
       const myName = user === "lui" ? "A" : "N";
       const daysUntil = Math.ceil((new Date(unlockDate) - new Date()) / 86400000);
@@ -1299,13 +1307,46 @@ function CapsulePage({user}) {
     setSending(false);
   };
 
-  // Separate messages: those for you vs those from you
-  const forMe = messages.filter(m => m.author !== user);
-  const fromMe = messages.filter(m => m.author === user);
+  // ── Logique de tri ──────────────────────────────────────────────────────────
+  // Mémoire = déverrouillé ET déverrouillé depuis > 7 jours
+  const SEPT_JOURS_MS = 7 * 24 * 60 * 60 * 1000;
+  const isMemoire = (msg) => {
+    const unlockTs = parseLocalDate(msg.unlockDate).getTime();
+    return Date.now() >= unlockTs && (Date.now() - unlockTs) > SEPT_JOURS_MS;
+  };
+
+  const msgsCapsule = messages.filter(m => !isMemoire(m));
+  const msgsMemoire = messages.filter(m =>  isMemoire(m));
+  const visibleMsgs = activeTab === "capsule" ? msgsCapsule : msgsMemoire;
+
+  const forMe  = visibleMsgs.filter(m => m.author !== user);
+  const fromMe = visibleMsgs.filter(m => m.author === user);
+
+  // ── Styles onglets ──────────────────────────────────────────────────────────
+  const tabStyle = (tab) => ({
+    background: "none",
+    border: "none",
+    borderBottom: `2px solid ${activeTab === tab ? "#3b82f6" : "transparent"}`,
+    color: activeTab === tab ? "#93c5fd" : "#475569",
+    cursor: "pointer",
+    fontFamily: "'Outfit',sans-serif",
+    fontSize: 12,
+    fontWeight: 500,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    padding: "10px 20px",
+    transition: "color .2s, border-color .2s",
+  });
+
+  // ── Messages d'absence poétiques ────────────────────────────────────────────
+  const emptyPoem = activeTab === "capsule"
+    ? { icon: "🔒", text: "Aucun message scellé pour l'instant…", sub: "Sois le premier à préparer une surprise ♡" }
+    : { icon: "🌙", text: "Aucun souvenir dans la mémoire…", sub: "Les messages dévoilés depuis plus d'une semaine apparaîtront ici ♡" };
 
   return (
     <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
-      {/* Header */}
+
+      {/* ── En-tête ── */}
       <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
         <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — CAPSULE TEMPORELLE — ◆</span>
         <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(34px,5vw,56px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>Messages Cachés</h2>
@@ -1319,8 +1360,8 @@ function CapsulePage({user}) {
         </div>
       </div>
 
-      {/* Bouton préparer */}
-      <div className="fade-up-d1" style={{marginBottom:40}}>
+      {/* ── Formulaire ── */}
+      <div className="fade-up-d1" style={{marginBottom:32}}>
         {!showForm ? (
           <div style={{textAlign:"center"}}>
             <button className="btn-primary" onClick={()=>setShowForm(true)} style={{padding:"14px 32px",fontSize:12,letterSpacing:2}}>
@@ -1347,10 +1388,30 @@ function CapsulePage({user}) {
         )}
       </div>
 
-      {/* Messages reçus */}
-      {loading && <div style={{textAlign:"center",padding:"48px 0"}}><div style={{width:32,height:32,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>}
+      {/* ── Onglets ── */}
+      <div className="fade-up-d2" style={{display:"flex",borderBottom:"1px solid #0f2a4a",marginBottom:36,gap:4}}>
+        <button style={tabStyle("capsule")} onClick={()=>setActiveTab("capsule")}
+          onMouseEnter={e=>{if(activeTab!=="capsule")e.currentTarget.style.color="#93c5fd";}}
+          onMouseLeave={e=>{if(activeTab!=="capsule")e.currentTarget.style.color="#475569";}}>
+          Capsule ({msgsCapsule.length})
+        </button>
+        <button style={tabStyle("memoire")} onClick={()=>setActiveTab("memoire")}
+          onMouseEnter={e=>{if(activeTab!=="memoire")e.currentTarget.style.color="#93c5fd";}}
+          onMouseLeave={e=>{if(activeTab!=="memoire")e.currentTarget.style.color="#475569";}}>
+          Mémoire ({msgsMemoire.length})
+        </button>
+      </div>
+
+      {/* ── Contenu ── */}
+      {loading && (
+        <div style={{textAlign:"center",padding:"48px 0"}}>
+          <div style={{width:32,height:32,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/>
+        </div>
+      )}
+
       {!loading && (
         <>
+          {/* Messages pour moi */}
           {forMe.length > 0 && (
             <div style={{marginBottom:40}}>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
@@ -1363,6 +1424,8 @@ function CapsulePage({user}) {
               </div>
             </div>
           )}
+
+          {/* Messages de moi */}
           {fromMe.length > 0 && (
             <div>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
@@ -1375,11 +1438,13 @@ function CapsulePage({user}) {
               </div>
             </div>
           )}
-          {messages.length===0 && (
+
+          {/* Onglet vide */}
+          {visibleMsgs.length === 0 && (
             <div style={{textAlign:"center",padding:"80px 0"}}>
-              <div style={{fontSize:52,marginBottom:16,opacity:.3}}>🔒</div>
-              <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:"#334155",fontStyle:"italic"}}>La capsule est vide pour l'instant…</p>
-              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:12,color:"#1e3a5f",marginTop:8,letterSpacing:2}}>Sois le premier à sceller un message ♡</p>
+              <div style={{fontSize:52,marginBottom:16,opacity:.3}}>{emptyPoem.icon}</div>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#334155",fontStyle:"italic",lineHeight:1.7}}>{emptyPoem.text}</p>
+              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",marginTop:10,letterSpacing:2}}>{emptyPoem.sub}</p>
             </div>
           )}
         </>
