@@ -279,6 +279,10 @@ const G = () => (
     @keyframes flashbackIn{from{opacity:0;transform:scale(1.08)}to{opacity:1;transform:scale(1)}}
     @keyframes vinylSpin{to{transform:rotate(360deg)}}
     @keyframes barBounce{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+    @media(max-width:480px){
+      .song-card-wrap{min-width:160px!important;max-width:160px!important}
+      .song-vinyl{width:90px!important;height:90px!important}
+    }
     .eq-bar{display:inline-block;width:3px;border-radius:2px;transform-origin:bottom;background:#fff;margin:0 1px}
     .eq-bar-1{animation:barBounce .6s ease-in-out infinite}
     .eq-bar-2{animation:barBounce .6s .15s ease-in-out infinite}
@@ -322,6 +326,7 @@ const G = () => (
     .corner-bracket.bl{bottom:0;left:0}.corner-bracket.bl::before{bottom:0;left:0;width:100%;height:1px}.corner-bracket.bl::after{bottom:0;left:0;height:100%;width:1px}
     .corner-bracket.br{bottom:0;right:0}.corner-bracket.br::before{bottom:0;right:0;width:100%;height:1px}.corner-bracket.br::after{bottom:0;right:0;height:100%;width:1px}
     .anniv-row{transition:background .2s,border-color .2s}
+    @media(max-width:480px){.anniv-grid-row{grid-template-columns:44px 1fr 60px 36px!important;gap:10px!important;padding:12px 14px!important}}
     .anniv-row:hover{background:rgba(30,58,95,.15)!important;border-color:#1e3a5f!important}
     .lightbox{position:fixed;inset:0;background:rgba(2,12,27,.96);display:flex;align-items:center;justify-content:center;z-index:2000;animation:fadeUp .2s ease}
     .lightbox img{max-width:90vw;max-height:85vh;object-fit:contain;border-radius:4px;box-shadow:0 0 60px rgba(0,0,0,.8)}
@@ -331,29 +336,38 @@ const G = () => (
     body.anniv-bg .video-bg-container{display:block}
     body.anniv-bg{background:#020c1b}
     @keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
-    .confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;animation:confettiFall linear forwards;pointer-events:none;z-index:9999}
-    /* ── Mode Mobile ── */
-    .mobile-menu-btn{display:none;background:none;border:none;cursor:pointer;padding:8px;color:#93c5fd;font-size:20px}
-    .mobile-nav-drawer{display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(2,12,27,.97);backdrop-filter:blur(20px);z-index:99;flex-direction:column;align-items:center;justify-content:center;gap:32px}
-    .mobile-nav-drawer.open{display:flex}
-    .mobile-nav-link{font-family:'Outfit',sans-serif;font-size:20px;letter-spacing:4px;text-transform:uppercase;color:#475569;cursor:pointer;transition:color .2s;padding:8px 0}
-    .mobile-nav-link.active,.mobile-nav-link:active{color:#93c5fd}
-    .desktop-nav{display:flex;align-items:center;gap:24px}
-    /* Petit détail photo mémoire */
-    .photo-detail-tag{display:inline-block;background:rgba(29,78,216,.15);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:4px 10px;font-family:'Outfit',sans-serif;font-size:10px;letter-spacing:2px;color:#60a5fa;text-transform:uppercase;margin-top:8px}
-    /* Fonctionnalités État */
-    .love-note-bubble{background:linear-gradient(135deg,rgba(244,114,182,.08),rgba(59,130,246,.08));border:1px solid rgba(244,114,182,.2);border-radius:12px;padding:16px 20px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:16px;color:#f9a8d4;line-height:1.7;text-align:center}
-    .star-rating-btn{background:none;border:none;cursor:pointer;font-size:28px;transition:transform .15s;padding:4px}
-    .star-rating-btn:hover{transform:scale(1.3)}
-    .surprise-btn{background:linear-gradient(135deg,rgba(244,114,182,.15),rgba(168,85,247,.15));border:1px solid rgba(244,114,182,.3);border-radius:12px;padding:14px 28px;font-family:'Cormorant Garamond',serif;font-size:16px;color:#f9a8d4;cursor:pointer;transition:all .2s;letter-spacing:1px}
-    .surprise-btn:hover{transform:scale(1.03);box-shadow:0 0 20px rgba(244,114,182,.2)}
-    /* Journal intime partagé */
-    .journal-entry{background:rgba(13,27,42,.7);border:1px solid rgba(59,130,246,.15);border-radius:12px;padding:20px 24px;margin-bottom:12px;position:relative}
-    .journal-entry::before{content:'';position:absolute;left:0;top:16px;bottom:16px;width:2px;background:linear-gradient(to bottom,#3b82f6,#f472b6);border-radius:0 2px 2px 0}
+
+    /* ── MODE MOBILE ─────────────────────────────────────────────────── */
     @media(max-width:640px){
-      .desktop-nav{display:none}
-      .mobile-menu-btn{display:block}
+      .page-inner{padding-left:16px!important;padding-right:16px!important;padding-top:40px!important}
     }
+    @media(max-width:640px){
+      .desktop-nav-links{display:none!important}
+      .bottom-nav{display:flex!important}
+      .page-content{padding-bottom:90px!important}
+      .daily-banner-mobile{bottom:76px!important}
+      .user-badge-mobile{display:none!important}
+    }
+    @media(min-width:641px){
+      .bottom-nav{display:none!important}
+    }
+    .bottom-nav{
+      position:fixed;bottom:0;left:0;right:0;z-index:200;
+      background:rgba(2,12,27,.95);backdrop-filter:blur(20px);
+      border-top:1px solid rgba(30,58,95,.5);
+      height:65px;align-items:stretch;justify-content:space-around;
+    }
+    .bottom-nav-item{
+      flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:3px;cursor:pointer;transition:all .2s;padding:6px 4px;
+      color:#475569;border:none;background:none;
+    }
+    .bottom-nav-item.active{color:#93c5fd}
+    .bottom-nav-item.active .bnav-dot{opacity:1}
+    .bottom-nav-item span:first-child{font-size:20px;line-height:1}
+    .bottom-nav-item .bnav-label{font-family:'Outfit',sans-serif;font-size:9px;letter-spacing:1px;text-transform:uppercase}
+    .bnav-dot{width:4px;height:4px;border-radius:50%;background:#3b82f6;margin-top:2px;opacity:0;transition:opacity .2s}
+    .confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;animation:confettiFall linear forwards;pointer-events:none;z-index:9999}
   `}</style>
 );
 
@@ -480,7 +494,7 @@ function HeartsBlock({user}) {
         <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Nos Cœurs</span>
         <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
       </div>
-      <div style={{display:"flex",gap:16,maxWidth:500,margin:"0 auto"}}>
+      <div style={{display:"flex",gap:12,maxWidth:500,margin:"0 auto",flexWrap:"wrap"}}>
         <HeartCounter field={theirField} label={theirLabel} clickable={false}/>
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#1e3a5f",flexShrink:0}}>♡</div>
         <HeartCounter field={myField} label={myLabel} clickable={true}/>
@@ -752,26 +766,22 @@ function HomePage({isAdmin, user}) {
   const [playingId,setPlayingId]=useState(null);
   const [songColor,setSongColor]=useState(0);
 
+  // Chansons prédéfinies (toujours présentes visuellement)
+  const PRESET_SONGS = [
+    {id:"preset_1",title:"Anyone Who Loves Me",artist:"Charlotte Cardin",why:"Pour toi, pour nous ♡",color:2,spotifyId:"5odKbFc5VVJcLMkBuBSYzQ"},
+    {id:"preset_2",title:"Every Breath You Take",artist:"The Police",why:"Chaque instant avec toi 💙",color:5,spotifyId:"1JSTJqkT5qHq8MDJnJbRE1"},
+    {id:"preset_3",title:"Twenty to One",artist:"Dave",why:"Notre groove à nous 🌸",color:0,spotifyId:null},
+  ];
+
   useEffect(()=>{
     waitForFirebase().then(async()=>{
-      try{
-        const data=await fbCall('fbGetPlaylist');
-        // Ajouter les 3 chansons préchargées si elles n'existent pas encore
-        const PRESET_SONGS = [
-          {id:"preset_charlotte",title:"Anyone Who Loves Me",artist:"Charlotte Cardin",why:"Cette voix qui ressemble à une caresse… ♡",color:3},
-          {id:"preset_police",title:"Every Breath You Take",artist:"The Police",why:"\"I'll be watching you\" — chaque souffle pour toi.",color:1},
-          {id:"preset_dave",title:"Twenty to One",artist:"Dave",why:"Les mots qu'on ne dit pas assez fort. 💙",color:0},
-        ];
-        const existingIds = new Set(data.map(s=>s.id));
-        let updated = [...data];
-        let changed = false;
-        for(const ps of PRESET_SONGS){
-          if(!existingIds.has(ps.id)){updated.push(ps);changed=true;}
-        }
-        if(changed){await fbCall('fbSetPlaylist',updated);}
-        setSongs(changed?updated:data);
+      try{const data=await fbCall('fbGetPlaylist');
+        // Fusionner preset + firebase (firebase peut overrider)
+        const fbIds = data.map(s=>s.id);
+        const merged = [...PRESET_SONGS.filter(p=>!fbIds.includes(p.id)), ...data];
+        setSongs(merged);
       }
-      catch(e){console.error("Playlist Firebase error:",e);setSongError("Impossible de charger la playlist. Vérifiez les règles Firestore.");}
+      catch(e){console.error("Playlist Firebase error:",e);setSongs(PRESET_SONGS);setSongError("");}
       setLoadingSongs(false);
     });
   },[]);
@@ -787,7 +797,7 @@ function HomePage({isAdmin, user}) {
   const removeSong=async(id)=>{await waitForFirebase();await fbCall('fbDeleteSong', id);setSongs(p=>p.filter(s=>s.id!==id));};
 
   return (
-    <div style={{position:"relative",zIndex:1,padding:"60px 24px 80px",maxWidth:860,margin:"0 auto"}}>
+    <div className="page-inner" style={{position:"relative",zIndex:1,padding:"60px 24px 80px",maxWidth:860,margin:"0 auto"}}>
       <div className="fade-up" style={{textAlign:"center",marginBottom:8}}>
         <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — 21.03.2025 — ◆</span>
       </div>
@@ -832,6 +842,8 @@ function HomePage({isAdmin, user}) {
       <FlashbackBlock/>
 
       <NotifButton user={user}/>
+
+      <JeuQuestionsBlock user={user}/>
 
       <HeartsBlock user={user}/>
 
@@ -892,12 +904,12 @@ function HomePage({isAdmin, user}) {
           </div>
         )}
         {!loadingSongs&&songs.length>0&&(
-          <div style={{display:"flex",gap:16,overflowX:"auto",paddingBottom:16,paddingTop:4,scrollbarWidth:"none"}}>
+          <div style={{display:"flex",gap:14,overflowX:"auto",paddingBottom:16,paddingTop:4,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
             {songs.map((song,i)=>{
               const grad=song.color!==undefined?GRADIENTS[song.color]:GRADIENTS[i%GRADIENTS.length];
               const isPlaying=playingId===song.id;
               return (
-                <div key={song.id} style={{minWidth:200,maxWidth:200,borderRadius:14,overflow:"hidden",background:"#0d1b2a",border:`1px solid ${isPlaying?"rgba(59,130,246,.5)":"#1e3a5f"}`,boxShadow:isPlaying?"0 0 30px rgba(59,130,246,.25)":"none",transition:"box-shadow .3s,border-color .3s",flexShrink:0,position:"relative"}}>
+                <div key={song.id} className="song-card-wrap" style={{minWidth:200,maxWidth:200,borderRadius:14,overflow:"hidden",background:"#0d1b2a",border:`1px solid ${isPlaying?"rgba(59,130,246,.5)":"#1e3a5f"}`,boxShadow:isPlaying?"0 0 30px rgba(59,130,246,.25)":"none",transition:"box-shadow .3s,border-color .3s",flexShrink:0,position:"relative"}}>
                   <div onClick={()=>setPlayingId(isPlaying?null:song.id)} style={{height:200,background:grad,position:"relative",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
                     <div style={{width:110,height:110,borderRadius:"50%",background:"radial-gradient(circle at 50%,#1a1a1a 28%,#2a2a2a 29%,#111 50%,#222 51%,#111 70%,#222 71%,#1a1a1a 100%)",boxShadow:"0 4px 20px rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",animation:isPlaying?"vinylSpin 3s linear infinite":"none"}}>
                       <div style={{width:28,height:28,borderRadius:"50%",background:"radial-gradient(circle,#333 40%,#222 100%)",border:"2px solid #444"}}/>
@@ -919,8 +931,25 @@ function HomePage({isAdmin, user}) {
                   </div>
                   <div style={{padding:"14px 14px 16px"}}>
                     <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,color:"#e2e8f0",marginBottom:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{song.title}</div>
-                    <div style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#3b82f6",letterSpacing:1,marginBottom:song.why?10:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{song.artist}</div>
-                    {song.why&&<div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:13,color:"#475569",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{song.why}</div>}
+                    <div style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#3b82f6",letterSpacing:1,marginBottom:song.why?6:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{song.artist}</div>
+                    {song.why&&<div style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:13,color:"#475569",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:song.spotifyId?8:0}}>{song.why}</div>}
+                    {song.spotifyId&&isPlaying&&(
+                      <div style={{marginTop:6}}>
+                        <iframe
+                          src={`https://open.spotify.com/embed/track/${song.spotifyId}?utm_source=generator&theme=0`}
+                          width="100%" height="80" frameBorder="0" allowFullScreen
+                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                          style={{borderRadius:8}}
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+                    {song.spotifyId&&!isPlaying&&(
+                      <div style={{display:"flex",alignItems:"center",gap:4,marginTop:4}}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#1db954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#1db954",letterSpacing:1}}>Spotify</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -957,186 +986,11 @@ function HomePage({isAdmin, user}) {
           </div>
         )}
       </div>
-
-      {/* ── ✨ JOURNAL INTIME PARTAGÉ — fonctionnalité révolutionnaire ── */}
-      <JournalPartage user={user} isAdmin={isAdmin} />
     </div>
   );
 }
 
-// ── Journal Intime Partagé ────────────────────────────────────────────────────
-// Chaque personne peut écrire une pensée du moment, visible par l'autre en temps réel.
-// Les entrées sont horodatées, affichées comme un fil de conscience partagée.
-function JournalPartage({ user, isAdmin }) {
-  const [entries, setEntries]       = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [text, setText]             = useState("");
-  const [mood, setMood]             = useState("💭");
-  const [sending, setSending]       = useState(false);
-  const [deleteId, setDeleteId]     = useState(null);
-
-  const MOODS = ["💭","🥰","😊","🥺","💙","🌙","✨","🔥","😂","🫂"];
-
-  useEffect(() => {
-    waitForFirebase().then(() => {
-      const unsub = window.firebase.firestore()
-        .collection("journal_partage")
-        .orderBy("createdAt","desc")
-        .limit(30)
-        .onSnapshot(snap => {
-          setEntries(snap.docs.map(d => Object.assign({id:d.id}, d.data())));
-          setLoading(false);
-        }, err => { console.error("Journal:", err); setLoading(false); });
-      return () => unsub();
-    });
-  }, []);
-
-  const handleAdd = async () => {
-    if (!text.trim()) return;
-    setSending(true);
-    try {
-      await waitForFirebase();
-      const db = window.firebase.firestore();
-      await db.collection("journal_partage").add({
-        author: user,
-        text: text.trim(),
-        mood,
-        createdAt: Date.now(),
-      });
-      // Notif à l'autre
-      const other = user === "lui" ? "elle" : "lui";
-      const myName = user === "lui" ? "A" : "N";
-      await fbCall('fbQueueNotif', other, "journal",
-        `${myName} a écrit dans le journal ✍️`,
-        `${mood} "${text.trim().slice(0,50)}${text.length>50?"…":""}" ♡`
-      );
-      setText("");
-    } catch(e) { console.error("Journal add:", e); }
-    setSending(false);
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await waitForFirebase();
-      await window.firebase.firestore().collection("journal_partage").doc(id).delete();
-    } catch(e) { console.error("Journal delete:", e); }
-    setDeleteId(null);
-  };
-
-  const fmt = (ts) => {
-    const d = new Date(ts);
-    const now = new Date();
-    const diff = (now - d) / 1000;
-    if (diff < 60) return "à l'instant";
-    if (diff < 3600) return `il y a ${Math.floor(diff/60)} min`;
-    if (diff < 86400) return `il y a ${Math.floor(diff/3600)} h`;
-    return d.toLocaleDateString("fr-FR", {day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
-  };
-
-  return (
-    <div style={{marginTop:64}}>
-      <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:32}}>
-        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
-        <div style={{textAlign:"center"}}>
-          <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155",display:"block"}}>Journal Intime Partagé</span>
-          <span style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:12,color:"#1e3a5f"}}>nos pensées, en temps réel ♡</span>
-        </div>
-        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
-      </div>
-
-      {/* Zone d'écriture */}
-      <div style={{background:"rgba(13,27,42,.8)",border:"1px solid rgba(59,130,246,.2)",borderRadius:16,padding:"24px",marginBottom:28,position:"relative"}}>
-        <div className="corner-bracket tl"/><div className="corner-bracket br"/>
-        <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155",marginBottom:12}}>
-          ✍️ Écris une pensée…
-        </div>
-        {/* Sélecteur d'humeur */}
-        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-          {MOODS.map(m => (
-            <button key={m} onClick={()=>setMood(m)}
-              style={{background:mood===m?"rgba(59,130,246,.2)":"rgba(13,27,42,.5)",
-                border:`1px solid ${mood===m?"rgba(59,130,246,.5)":"rgba(30,58,95,.4)"}`,
-                borderRadius:8,width:36,height:36,cursor:"pointer",fontSize:18,
-                transition:"all .15s",transform:mood===m?"scale(1.2)":"scale(1)",
-              }}>
-              {m}
-            </button>
-          ))}
-        </div>
-        <textarea
-          value={text}
-          onChange={e=>setText(e.target.value)}
-          placeholder="Une pensée, un souvenir, un rêve… juste pour nous. ♡"
-          style={{
-            width:"100%",minHeight:90,background:"rgba(8,20,35,.6)",
-            border:"1px solid rgba(30,58,95,.5)",borderRadius:10,
-            padding:"14px 16px",color:"#e2e8f0",
-            fontFamily:"'Cormorant Garamond',serif",fontSize:16,
-            lineHeight:1.7,resize:"vertical",boxSizing:"border-box",
-            outline:"none",transition:"border .2s",
-          }}
-          onFocus={e=>e.target.style.borderColor="rgba(59,130,246,.5)"}
-          onBlur={e=>e.target.style.borderColor="rgba(30,58,95,.5)"}
-          onKeyDown={e=>{if(e.ctrlKey&&e.key==="Enter")handleAdd();}}
-        />
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
-          <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#1e3a5f",letterSpacing:1}}>Ctrl+Entrée pour publier</span>
-          <button className="btn-primary" onClick={handleAdd} disabled={sending||!text.trim()}
-            style={{padding:"10px 24px",fontSize:11,letterSpacing:2,opacity:(!text.trim()||sending)?.5:1}}>
-            {sending?"…":"Publier ♡"}
-          </button>
-        </div>
-      </div>
-
-      {/* Fil du journal */}
-      {loading && <div style={{textAlign:"center",padding:"32px 0"}}><div style={{width:24,height:24,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>}
-      {!loading && entries.length === 0 && (
-        <div style={{textAlign:"center",padding:"48px 0"}}>
-          <div style={{fontSize:36,opacity:.2,marginBottom:12}}>📖</div>
-          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#334155",fontSize:18}}>
-            Votre journal partagé commence ici…<br/>
-            <span style={{fontSize:14,color:"#1e3a5f"}}>Chaque entrée est une page de votre histoire. ♡</span>
-          </p>
-        </div>
-      )}
-      <div>
-        {entries.map((entry, i) => {
-          const isMe = entry.author === user;
-          const authorColor = entry.author === "lui" ? "#60a5fa" : "#f9a8d4";
-          const authorLabel = entry.author === "lui" ? "Lui 💙" : "Elle 🌸";
-          return (
-            <div key={entry.id} className={`journal-entry fade-up`}
-              style={{animationDelay:`${i*.04}s`, paddingLeft:20}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:20}}>{entry.mood||"💭"}</span>
-                  <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,color:authorColor,textTransform:"uppercase"}}>{authorLabel}</span>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#334155",letterSpacing:1}}>{fmt(entry.createdAt)}</span>
-                  {(isMe||isAdmin) && (
-                    <button onClick={()=>handleDelete(entry.id)}
-                      style={{background:"none",border:"none",cursor:"pointer",color:"#334155",fontSize:12,padding:"0 4px",opacity:.5,transition:"opacity .15s"}}
-                      onMouseEnter={e=>e.target.style.opacity=1}
-                      onMouseLeave={e=>e.target.style.opacity=.5}>
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-              <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(15px,2vw,18px)",color:"#cbd5e1",lineHeight:1.8,margin:0,whiteSpace:"pre-wrap"}}>{entry.text}</p>
-            </div>
-          );
-        })}
-      </div>
-      {entries.length > 0 && (
-        <div style={{textAlign:"center",marginTop:24}}>
-          <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,color:"#1e3a5f"}}>✦ {entries.length} pensée{entries.length>1?"s":""} partagée{entries.length>1?"s":""} ♡ ✦</span>
-        </div>
-      )}
-    </div>
-  );
-}
+function AlbumPage({isAdmin}) {
   const [photos,setPhotos]=useState([]);
   const [loading,setLoading]=useState(true);
   const [uploading,setUploading]=useState(false);
@@ -1195,7 +1049,7 @@ function JournalPartage({ user, isAdmin }) {
   };
 
   return (
-    <div style={{position:"relative",zIndex:1,padding:"60px 24px 80px",maxWidth:1100,margin:"0 auto"}}>
+    <div className="page-inner" style={{position:"relative",zIndex:1,padding:"60px 24px 80px",maxWidth:1100,margin:"0 auto"}}>
       <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
         <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — NOTRE ALBUM — ◆</span>
         <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(36px,5vw,60px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>Nos Souvenirs</h2>
@@ -1508,9 +1362,6 @@ function App() {
 
   };
 
-  const [mobileMenu, setMobileMenu] = useState(false);
-  const goTo = (p) => { setPage(p); setMobileMenu(false); };
-
   if(!user)return <SiteGate onUnlock={handleUnlock}/>;
 
   const meta = USER_META[user];
@@ -1520,14 +1371,6 @@ function App() {
     ? (isAnnivAnnuel ? "🎂 Joyeux Anniversaire 🎂" : "🎉 Jour de Fête 🎉")
     : null;
 
-  const navItems = [
-    { key: "home", label: "Accueil" },
-    { key: "album", label: "Album" },
-    { key: "capsule", label: "Capsule ✦" },
-    { key: "etat", label: "État ♡" },
-    { key: "memoire", label: "Mémoire ✨" },
-  ];
-
   return (
     <div style={{minHeight:"100vh",background:"#020c1b",position:"relative"}}>
       {/* Vidéo de fond anniversaire */}
@@ -1536,18 +1379,20 @@ function App() {
       </div>
       <G/><BgDecor/>
       <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(2,12,27,.85)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(30,58,95,.4)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>goTo("home")}>
+        <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setPage("home")}>
           <div style={{width:8,height:8,background:isAnniv?"#fcd34d":"#3b82f6",borderRadius:"50%",boxShadow:isAnniv?"0 0 10px #fcd34d":"0 0 8px #3b82f6",transition:"all .5s"}}/>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:isAnniv?"#fcd34d":"#93c5fd",letterSpacing:2,transition:"color .5s"}}>Notre Histoire</span>
             {navSubtitle && <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,color:"#fcd34d",textTransform:"uppercase"}}>{navSubtitle}</span>}
           </div>
         </div>
-        {/* Desktop nav */}
-        <div className="desktop-nav">
-          {navItems.map(n=>(
-            <span key={n.key} className={`nav-link ${page===n.key?"active":""}`} onClick={()=>goTo(n.key)}>{n.label}</span>
-          ))}
+        <div className="desktop-nav-links" style={{display:"flex",alignItems:"center",gap:24}}>
+          <span className={`nav-link ${page==="home"?"active":""}`} onClick={()=>setPage("home")}>Accueil</span>
+          <span className={`nav-link ${page==="album"?"active":""}`} onClick={()=>setPage("album")}>Album</span>
+          <span className={`nav-link ${page==="capsule"?"active":""}`} onClick={()=>setPage("capsule")}>Capsule ✦</span>
+          <span className={`nav-link ${page==="etat"?"active":""}`} onClick={()=>setPage("etat")}>État ♡</span>
+          <span className={`nav-link ${page==="memoire"?"active":""}`} onClick={()=>setPage("memoire")}>Mémoire ✨</span>
+          {/* User badge */}
           <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,borderLeft:"1px solid rgba(30,58,95,.5)",paddingLeft:16}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontSize:13}}>{meta.emoji}</span>
@@ -1558,32 +1403,163 @@ function App() {
             )}
           </div>
         </div>
-        {/* Mobile menu button */}
-        <button className="mobile-menu-btn" onClick={()=>setMobileMenu(m=>!m)}>
-          {mobileMenu ? "✕" : "☰"}
-        </button>
       </nav>
-      {/* Mobile drawer */}
-      <div className={`mobile-nav-drawer${mobileMenu?" open":""}`}>
-        {navItems.map(n=>(
-          <span key={n.key} className={`mobile-nav-link${page===n.key?" active":""}`} onClick={()=>goTo(n.key)}>{n.label}</span>
+      {/* Bottom nav mobile */}
+      <nav className="bottom-nav">
+        {[
+          {id:"home",   icon:"🏠", label:"Accueil"},
+          {id:"album",  icon:"📷", label:"Album"},
+          {id:"capsule",icon:"💌", label:"Capsule"},
+          {id:"etat",   icon:"💭", label:"État"},
+          {id:"memoire",icon:"✨", label:"Mémoire"},
+        ].map(tab => (
+          <button key={tab.id} className={`bottom-nav-item${page===tab.id?" active":""}`} onClick={()=>setPage(tab.id)}>
+            <span>{tab.icon}</span>
+            <span className="bnav-label">{tab.label}</span>
+            <div className="bnav-dot"/>
+          </button>
         ))}
-        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:16,padding:"12px 24px",background:"rgba(13,27,42,.5)",borderRadius:12}}>
-          <span style={{fontSize:20}}>{meta.emoji}</span>
-          <span style={{fontFamily:"'Outfit',sans-serif",fontSize:14,letterSpacing:2,color:isAdmin?"#60a5fa":"#f9a8d4"}}>{meta.label}{isAdmin?" · Admin":""}</span>
-        </div>
-      </div>
+      </nav>
+      <div className="page-content">
       {page==="home"&&<HomePage isAdmin={isAdmin} user={user}/>}
       {page==="album"&&<AlbumPage isAdmin={isAdmin}/>}
       {page==="capsule"&&<CapsulePage user={user} autoOpenForm={openCapsuleForm} onFormOpened={()=>setOpenCapsuleForm(false)}/>}
       {page==="etat"&&<EtatPage user={user}/>}
       {page==="memoire"&&<MemoirePage user={user}/>}
-      <DailyReminderBanner user={user} onWriteClick={()=>{ goTo("capsule"); setOpenCapsuleForm(true); }}/>
+      </div>
+      <DailyReminderBanner user={user} onWriteClick={()=>{ setPage("capsule"); setOpenCapsuleForm(true); }}/>
       <footer style={{borderTop:"1px solid rgba(30,58,95,.3)",padding:"20px 32px",display:"flex",alignItems:"center",justifyContent:"center",gap:20,position:"relative",zIndex:1}}>
         <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#0f2a4a)"}}/>
         <span style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#1e3a5f",fontSize:13}}>♡ Pour toujours ♡</span>
         <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#0f2a4a)"}}/>
       </footer>
+    </div>
+  );
+}
+
+// ─── Jeu des Questions du Soir ───────────────────────────────────────────────
+// La fonctionnalité révolutionnaire : chaque soir une question pour se découvrir
+
+const QUESTIONS_COUPLE = [
+  {q:"Si on avait une journée entière, juste nous deux, tu ferais quoi ?", cat:"🌙 Rêves"},
+  {q:"C'est quoi le moment avec moi qui t'a le plus surpris(e) en bien ?", cat:"💫 Souvenirs"},
+  {q:"Si tu pouvais changer une chose de ta journée aujourd'hui, c'est quoi ?", cat:"💭 Introspection"},
+  {q:"Qu'est-ce que je fais qui te fait sourire même quand t'es pas de bonne humeur ?", cat:"🌸 Amour"},
+  {q:"C'est quoi ton rêve le plus fou qu'on pourrait réaliser ensemble ?", cat:"✨ Futur"},
+  {q:"Qu'est-ce que tu penses que je pense de toi en ce moment ?", cat:"💙 Connexion"},
+  {q:"Si tu devais me décrire en 3 mots aujourd'hui, ce serait quoi ?", cat:"🌊 Regard"},
+  {q:"Qu'est-ce qui t'a le plus touché(e) que je t'aie dit ou fait ?", cat:"♡ Tendresse"},
+  {q:"T'as peur de quoi en ce moment ? Je t'écoute.", cat:"🫂 Vulnérabilité"},
+  {q:"C'est quoi une chose que tu ne m'as jamais dite mais que tu penses souvent ?", cat:"🔐 Secret"},
+  {q:"Si tu pouvais vivre un de nos souvenirs encore une fois, lequel ?", cat:"⏳ Nostalgie"},
+  {q:"Qu'est-ce qui te manque de moi quand on est séparés ?", cat:"💌 Distance"},
+  {q:"C'est quoi notre plus belle qualité à nous en tant que couple ?", cat:"💛 Nous deux"},
+  {q:"Dans 10 ans, tu t'imagines où, avec moi ?", cat:"🏡 Avenir"},
+  {q:"Qu'est-ce que tu ferais si tu savais que je ne jugerai jamais ta réponse ?", cat:"🌙 Liberté"},
+];
+
+function JeuQuestionsBlock({user}) {
+  const TODAY_KEY = "nh_question_" + new Date().toISOString().split("T")[0];
+  const dayIdx = Math.floor(Date.now() / 86400000);
+  const dailyQ = QUESTIONS_COUPLE[dayIdx % QUESTIONS_COUPLE.length];
+
+  const [answer, setAnswer] = React.useState(() => {
+    try { return localStorage.getItem(TODAY_KEY + "_ans_" + user) || ""; } catch { return ""; }
+  });
+  const [saved, setSaved] = React.useState(() => {
+    try { return !!localStorage.getItem(TODAY_KEY + "_saved_" + user); } catch { return false; }
+  });
+  const [theirAnswer, setTheirAnswer] = React.useState(() => {
+    try { return localStorage.getItem(TODAY_KEY + "_ans_" + (user==="lui"?"elle":"lui")) || null; } catch { return null; }
+  });
+  const [revealed, setRevealed] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  const handleSave = async () => {
+    if (!answer.trim()) return;
+    setSaving(true);
+    try {
+      localStorage.setItem(TODAY_KEY + "_saved_" + user, "1");
+      localStorage.setItem(TODAY_KEY + "_ans_" + user, answer.trim());
+      const other = user === "lui" ? "elle" : "lui";
+      await fbCall('fbQueueNotif', other, "question",
+        "Question du soir ✦",
+        (user==="lui"?"A":"N") + " a répondu à la question du soir — à toi ! 💙"
+      );
+      setSaved(true);
+    } catch(e) {}
+    setSaving(false);
+  };
+
+  return (
+    <div className="fade-up-d2" style={{marginBottom:48}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Question du Soir ✦</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+
+      <div style={{background:"linear-gradient(135deg,rgba(29,78,216,.08),rgba(13,27,42,.9))",border:"1px solid rgba(59,130,246,.25)",borderRadius:16,padding:"28px 24px",position:"relative",boxShadow:"0 0 40px rgba(29,78,216,.08)"}}>
+        <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+
+        {/* Badge catégorie */}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+          <span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:"#1d4ed8",letterSpacing:2,background:"rgba(29,78,216,.15)",padding:"4px 10px",borderRadius:999,border:"1px solid rgba(59,130,246,.2)"}}>{dailyQ.cat}</span>
+          <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#334155",letterSpacing:1,textTransform:"uppercase",marginLeft:"auto"}}>Renouvelle chaque jour</span>
+        </div>
+
+        {/* La question */}
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"clamp(17px,2.8vw,22px)",lineHeight:1.7,color:"#e2e8f0",margin:"0 0 22px",textShadow:"0 0 30px rgba(147,197,253,.15)"}}>
+          "{dailyQ.q}"
+        </p>
+
+        {/* Réponse */}
+        {!saved ? (
+          <div>
+            <textarea
+              value={answer}
+              onChange={e=>setAnswer(e.target.value)}
+              placeholder="Ta réponse, en toute honnêteté…"
+              rows={3}
+              style={{marginBottom:12,resize:"vertical",fontSize:14}}
+            />
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+              <button className="btn-primary" onClick={handleSave} disabled={saving || !answer.trim()} style={{opacity:!answer.trim()?.5:1}}>
+                {saving?"Envoi…":"Partager ma réponse ♡"}
+              </button>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#1e3a5f",letterSpacing:1}}>L'autre sera notifié(e)</span>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{background:"rgba(8,20,35,.6)",borderRadius:10,padding:"14px 18px",border:"1px solid rgba(59,130,246,.15)",marginBottom:16}}>
+              <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:user==="lui"?"#60a5fa":"#f472b6",marginBottom:6}}>Ta réponse ♡</div>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,color:"#cbd5e1",lineHeight:1.7,margin:0}}>{answer}</p>
+            </div>
+
+            {/* Réponse de l'autre (simulée côté local pour la démo) */}
+            {theirAnswer ? (
+              revealed ? (
+                <div style={{background:"rgba(8,20,35,.6)",borderRadius:10,padding:"14px 18px",border:"1px solid rgba(244,114,182,.15)",animation:"fadeUp .5s ease"}}>
+                  <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,textTransform:"uppercase",color:user==="lui"?"#f472b6":"#60a5fa",marginBottom:6}}>{user==="lui"?"Sa réponse 🌸":"Sa réponse 💙"}</div>
+                  <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,color:"#cbd5e1",lineHeight:1.7,margin:0}}>{theirAnswer}</p>
+                </div>
+              ) : (
+                <button className="btn-ghost" onClick={()=>setRevealed(true)} style={{width:"100%",padding:"12px"}}>
+                  Voir la réponse de l'autre 🔍
+                </button>
+              )
+            ) : (
+              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",letterSpacing:1,textAlign:"center",marginTop:10}}>
+                En attente de la réponse de l'autre… ⏳
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+      <p style={{textAlign:"center",marginTop:10,fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,color:"#1e3a5f"}}>
+        ✦ Une nouvelle question chaque jour — pour se connaître encore plus ✦
+      </p>
     </div>
   );
 }
@@ -1892,7 +1868,7 @@ function EtatPage({ user }) {
   );
 
   return (
-    <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:780,margin:"0 auto"}}>
+    <div className="page-inner" style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:780,margin:"0 auto"}}>
 
       {/* ── En-tête ── */}
       <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
@@ -1956,178 +1932,135 @@ function EtatPage({ user }) {
             <HistoriqueBar historique={historique} user={user} />
           </div>
 
-          {/* ── ✨ Fonctionnalité 1 : Mot doux du jour ── */}
-          <MotDouxDuJour user={user} />
+          {/* ── Fonctionnalités mignonnes ── */}
+          <div className="fade-up-d4" style={{marginTop:40}}>
+            {/* Compatibilité du jour */}
+            {myEtat && theirEtat && (
+              <CompatibiliteBlock myEtat={myEtat} theirEtat={theirEtat} user={user} other={other}/>
+            )}
 
-          {/* ── ✨ Fonctionnalité 2 : Étoiles d'amour ── */}
-          <EtoilesAmour user={user} />
+            {/* Câlin virtuel */}
+            <CablinBlock user={user} other={other}/>
 
-          {/* ── ✨ Fonctionnalité 3 : Câlin virtuel ── */}
-          <CalinVirtuel user={user} />
+            {/* Note secrète du jour */}
+            <NoteSecrete user={user} other={other}/>
+          </div>
         </>
       )}
     </div>
   );
 }
 
-// ── Mot doux du jour ──────────────────────────────────────────────────────────
-const MOTS_DOUX = [
-  "Tu es mon soleil même les jours nuageux. ☀️",
-  "Penser à toi suffit pour sourire. 🥰",
-  "T'es tellement magnifique, je te le dis pas assez. ♡",
-  "J'aime tous tes petits défauts autant que tes qualités.",
-  "Ma meilleure décision : toi. ✨",
-  "Si je pouvais refaire ma vie, je te choisirais encore. 💙",
-  "Tu mérites tout le bonheur du monde.",
-  "Je suis si chanceux·se de t'avoir.",
-  "Rien que toi, tout le temps. ♡",
-  "Tu es la plus belle partie de mes journées.",
-];
-function MotDouxDuJour({ user }) {
-  const [mot, setMot] = useState("");
-  const [revealed, setRevealed] = useState(false);
-  const today = new Date().toISOString().split("T")[0];
+// ─── Compatibilité du jour ────────────────────────────────────────────────────
+function CompatibiliteBlock({myEtat, theirEtat, user, other}) {
+  const COMPAT_MAP = {
+    "🥰🥰":["Vibe parfaite","Vous êtes sur la même longueur d'onde — journée parfaite pour un câlin 🌸"],
+    "🥰😊":["Bonne énergie","Tu débords d'amour, iel est bien — profites-en pour lui dire quelque chose de beau 💙"],
+    "🥰😌":["Douceur partagée","Tu es amoureux·se, iel est tranquille — la complicité douce du quotidien ♡"],
+    "🥰😔":["Prends soin de lui/elle","Tu rayonnes — ton amour peut l'aider à aller mieux 🫂"],
+    "😊😊":["Journée équilibrée","Vous allez bien tous les deux — parfait pour faire quelque chose ensemble 💛"],
+    "😔😔":["Journée difficile","Vous traversez tous les deux un moment dur — serrés fort l'un contre l'autre 🫂"],
+    "😩😩":["Épuisement partagé","Vous êtes tous les deux à plat — soirée canapé obligatoire 🛋️"],
+    "🤩🤩":["Vibe euphorique","Vous êtes tous les deux au sommet — ce soir on célèbre ! 🎉"],
+    "default":["Énergie complémentaire","Vos humeurs s'équilibrent — vous vous complétez naturellement 🌊"],
+  };
+  const key = myEtat.humeur + theirEtat.humeur;
+  const [title, desc] = COMPAT_MAP[key] || COMPAT_MAP["default"];
+  const pct = Math.floor(60 + Math.random() * 40); // 60–99%
+  // Stable pendant la journée basé sur les humeurs
+  const seed = myEtat.humeur.charCodeAt(0) + theirEtat.humeur.charCodeAt(0);
+  const stablePct = 60 + (seed % 40);
 
-  useEffect(() => {
-    const key = `nh_mot_doux_${today}`;
+  return (
+    <div style={{background:"rgba(13,27,42,.6)",border:"1px solid rgba(59,130,246,.2)",borderRadius:14,padding:"24px",marginBottom:16,position:"relative"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <span style={{fontSize:22}}>💞</span>
+        <div>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#3b82f6",marginBottom:2}}>Compatibilité du jour</div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:"#e2e8f0"}}>{title}</div>
+        </div>
+        <div style={{marginLeft:"auto",textAlign:"right"}}>
+          <div style={{fontFamily:"'Space Mono',monospace",fontSize:26,fontWeight:700,color:"#93c5fd",textShadow:"0 0 12px rgba(147,197,253,.4)"}}>{stablePct}%</div>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#334155",letterSpacing:1}}>synchro</div>
+        </div>
+      </div>
+      <div className="progress-bar-track" style={{marginBottom:14}}><div className="progress-bar-fill" style={{width:`${stablePct}%`}}/></div>
+      <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#94a3b8",lineHeight:1.6,margin:0}}>{desc}</p>
+    </div>
+  );
+}
+
+// ─── Câlin virtuel ────────────────────────────────────────────────────────────
+function CablinBlock({user, other}) {
+  const CABLIN_KEY = "nh_cablin_" + new Date().toISOString().split("T")[0];
+  const [sent, setSent] = React.useState(() => {
+    try { return !!localStorage.getItem(CABLIN_KEY+"_sent_"+user); } catch { return false; }
+  });
+  const [received, setReceived] = React.useState(false);
+  const [hearts, setHearts] = React.useState([]);
+
+  const sendCablin = async () => {
+    if (sent) return;
+    // Créer des cœurs animés
+    setHearts(Array.from({length:8},(_,i) => ({id:i, x: 30+Math.random()*40, delay: i*0.1})));
+    setTimeout(() => setHearts([]), 1500);
     try {
-      const saved = localStorage.getItem(key);
-      if (saved) { setMot(saved); setRevealed(true); }
-      else { setMot(MOTS_DOUX[Math.floor(Math.random() * MOTS_DOUX.length)]); }
-    } catch { setMot(MOTS_DOUX[0]); }
-  }, []);
-
-  const reveal = () => {
-    const key = `nh_mot_doux_${today}`;
-    try { localStorage.setItem(key, mot); } catch {}
-    setRevealed(true);
+      await fbCall('fbQueueNotif', other, "cablin",
+        user === "lui" ? "💙 Un câlin virtuel pour toi" : "🌸 Un câlin virtuel pour toi",
+        user === "lui" ? "A t'envoie un gros câlin 🫂♡" : "N t'envoie un gros câlin 🫂♡"
+      );
+    } catch(e) {}
+    try { localStorage.setItem(CABLIN_KEY+"_sent_"+user, "1"); } catch {}
+    setSent(true);
   };
 
   return (
-    <div style={{marginTop:48}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
-        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Mot doux du jour</span>
-        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
-      </div>
-      {!revealed ? (
-        <div style={{textAlign:"center"}}>
-          <button className="surprise-btn" onClick={reveal}>
-            🌸 Révéler le mot doux du jour
-          </button>
+    <div style={{background:"rgba(13,27,42,.6)",border:"1px solid rgba(244,114,182,.2)",borderRadius:14,padding:"20px 24px",marginBottom:16,textAlign:"center",position:"relative",overflow:"hidden"}}>
+      {hearts.map(h => (
+        <div key={h.id} style={{position:"absolute",left:`${h.x}%`,bottom:"20%",fontSize:20,animation:`confettiFall .8s ${h.delay}s ease forwards`,pointerEvents:"none"}}>♡</div>
+      ))}
+      <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#f472b6",marginBottom:8}}>Câlin du jour</div>
+      {sent ? (
+        <div>
+          <div style={{fontSize:36,marginBottom:8}}>🫂</div>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,color:"#f9a8d4",margin:0}}>Câlin envoyé ♡ L'autre le ressent…</p>
         </div>
       ) : (
-        <div className="love-note-bubble fade-up">
-          {mot}
+        <div>
+          <button onClick={sendCablin} style={{background:"none",border:"2px solid rgba(244,114,182,.3)",borderRadius:50,padding:"14px 32px",cursor:"pointer",transition:"all .2s",fontSize:32,display:"block",margin:"0 auto 10px"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(244,114,182,.7)";e.currentTarget.style.transform="scale(1.1)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(244,114,182,.3)";e.currentTarget.style.transform="scale(1)";}}
+          >🫂</button>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:14,color:"#475569",margin:0}}>Appuie pour envoyer un câlin virtuel ♡</p>
         </div>
       )}
     </div>
   );
 }
 
-// ── Étoiles d'amour ───────────────────────────────────────────────────────────
-function EtoilesAmour({ user }) {
-  const storageKey = `nh_etoiles_${user}_${new Date().toISOString().split("T")[0]}`;
-  const [stars, setStars] = useState(() => {
-    try { return parseInt(localStorage.getItem(storageKey) || "0"); } catch { return 0; }
-  });
-  const [justSaved, setJustSaved] = useState(false);
+// ─── Note secrète du jour ─────────────────────────────────────────────────────
+const NOTES_DU_JOUR = [
+  "Tu es la meilleure chose qui me soit arrivée 🌙",
+  "Je t'aime même quand tu ronfles 😘",
+  "Tu es mon endroit préféré dans ce monde ♡",
+  "Je t'aime plus que les pizzas — et c'est dire 🍕",
+  "Avec toi, les jours difficiles sont moins durs 💙",
+  "Tu es ridiculement beau/belle pour rien 😍",
+  "Je t'aime encore plus qu'hier — et ça fait beaucoup ♡",
+  "Tu me fais sourire même quand j'ai pas envie 🌸",
+  "Merci d'exister, sérieusement 💫",
+  "Mon cœur fait un truc chelou quand je pense à toi 🫀",
+];
 
-  const save = (n) => {
-    setStars(n);
-    try { localStorage.setItem(storageKey, String(n)); } catch {}
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 1500);
-  };
-
-  const LABELS = ["","💔 Pas terrible","😔 Bof","😊 Bien","💙 Très bien","🥰 Parfait !"];
+function NoteSecrete({user}) {
+  const dayIdx = Math.floor(Date.now() / 86400000);
+  const note = NOTES_DU_JOUR[dayIdx % NOTES_DU_JOUR.length];
+  const color = user === "lui" ? "#93c5fd" : "#f9a8d4";
   return (
-    <div style={{marginTop:40}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
-        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Notre journée ensemble</span>
-        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
-      </div>
-      <div style={{background:"rgba(13,27,42,.5)",border:"1px solid rgba(30,58,95,.4)",borderRadius:12,padding:"20px 24px",textAlign:"center"}}>
-        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#475569",marginBottom:16}}>
-          Comment tu vis notre journée aujourd'hui ?
-        </p>
-        <div style={{display:"flex",justifyContent:"center",gap:4,marginBottom:12}}>
-          {[1,2,3,4,5].map(n => (
-            <button key={n} className="star-rating-btn" onClick={() => save(n)}>
-              {n <= stars ? "⭐" : "☆"}
-            </button>
-          ))}
-        </div>
-        {stars > 0 && (
-          <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:justSaved?"#f472b6":"#334155",letterSpacing:2,transition:"color .3s"}}>
-            {justSaved ? "✓ Enregistré ♡" : LABELS[stars]}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Câlin virtuel ─────────────────────────────────────────────────────────────
-function CalinVirtuel({ user }) {
-  const [calinSent, setCalinSent] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [hearts, setHearts] = useState([]);
-
-  const envoyerCalin = async () => {
-    setSending(true);
-    // Petite animation de cœurs
-    const newHearts = Array.from({length:8}, (_,i) => ({
-      id: i, x: 40+Math.random()*20, delay: i*0.1
-    }));
-    setHearts(newHearts);
-    setTimeout(() => setHearts([]), 2000);
-
-    try {
-      await waitForFirebase();
-      const other = user === "lui" ? "elle" : "lui";
-      const myName = user === "lui" ? "A" : "N";
-      await fbCall('fbQueueNotif', other, "calin",
-        `${myName} t'envoie un câlin 🤗`,
-        "Quelqu'un pense à toi très fort ♡"
-      );
-      setCalinSent(true);
-      setTimeout(() => setCalinSent(false), 4000);
-    } catch(e) { console.error("Câlin:", e); }
-    setSending(false);
-  };
-
-  return (
-    <div style={{marginTop:40,marginBottom:16}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
-        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Câlin virtuel</span>
-        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
-      </div>
-      <div style={{textAlign:"center",position:"relative"}}>
-        {/* Cœurs animés */}
-        {hearts.map(h => (
-          <span key={h.id} style={{
-            position:"absolute",left:`${h.x}%`,top:0,fontSize:20,
-            animation:`confettiFall 2s ease forwards`,
-            animationDelay:`${h.delay}s`,
-            pointerEvents:"none",zIndex:5,
-          }}>♡</span>
-        ))}
-        {calinSent ? (
-          <div className="love-note-bubble fade-up" style={{color:"#f9a8d4"}}>
-            🤗 Câlin envoyé ! L'autre va le recevoir ♡
-          </div>
-        ) : (
-          <button className="surprise-btn" onClick={envoyerCalin} disabled={sending} style={{opacity:sending?.7:1}}>
-            {sending ? "Envoi…" : "🤗 Envoyer un câlin"}
-          </button>
-        )}
-        <p style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#1e3a5f",letterSpacing:2,marginTop:12}}>
-          ✦ Envoie une notification câlin à l'autre ✦
-        </p>
-      </div>
+    <div style={{background:"rgba(13,27,42,.5)",border:"1px dashed rgba(30,58,95,.5)",borderRadius:14,padding:"20px 24px",textAlign:"center"}}>
+      <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#334155",marginBottom:10}}>✦ Note du jour ✦</div>
+      <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"clamp(15px,3vw,19px)",color,lineHeight:1.7,margin:0,textShadow:`0 0 20px ${color}40`}}>{note}</p>
     </div>
   );
 }
@@ -2226,9 +2159,445 @@ function CapsulePage({user, autoOpenForm, onFormOpened}) {
   const emptyPoem = { icon: "🔒", text: "Aucun message pour l'instant…", sub: "Sois le premier à préparer une surprise ♡" };
 
   return (
-    <div style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
+    <div className="page-inner" style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
 
       {/* ── En-tête ── */}
       <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
         <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — CAPSULE TEMPORELLE — ◆</span>
         <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(34px,5vw,56px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>Messages Cachés</h2>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#475569",fontSize:16,marginTop:8}}>
+          Des mots scellés dans le temps, qui se dévoilent au moment choisi.
+        </p>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}>
+          <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+          <span style={{color:"#1e3a5f",fontSize:10}}>♡</span>
+          <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+        </div>
+      </div>
+
+      {/* ── Formulaire ── */}
+      <div className="fade-up-d1" style={{marginBottom:32}}>
+        {!showForm ? (
+          <div style={{textAlign:"center"}}>
+            <button className="btn-primary" onClick={()=>setShowForm(true)} style={{padding:"14px 32px",fontSize:12,letterSpacing:2}}>
+              {user==="lui" ? "🎁 Préparer une surprise" : "💌 Envoyer un message"}
+            </button>
+          </div>
+        ) : (
+          <div style={{background:"rgba(13,27,42,.9)",border:"1px solid rgba(59,130,246,.3)",borderRadius:14,padding:"28px",boxShadow:"0 0 40px rgba(59,130,246,.08)"}}>
+            <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+            <h3 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:"#e2e8f0",marginBottom:4}}>
+              {user==="lui" ? "Une surprise pour elle 💙" : "Un message pour lui 🌸"}
+            </h3>
+            <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#334155",letterSpacing:1,marginBottom:20}}>Le message sera flouté jusqu'à la date choisie.</p>
+            <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Ton message *</label>
+            <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Écris ce que tu veux lui dire…" rows={5} style={{marginBottom:16,resize:"vertical"}}/>
+            <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Se dévoile le *</label>
+            <input type="date" value={unlockDate} min={minStr} onChange={e=>setUnlockDate(e.target.value)} style={{marginBottom:16,width:"auto"}}/>
+
+            {/* ── Photo optionnelle ── */}
+            <label style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#475569",display:"block",marginBottom:8}}>Photo souvenir (optionnel)</label>
+            {!photoPreview ? (
+              <div
+                onClick={()=>photoRef.current?.click()}
+                style={{border:"1px dashed rgba(30,58,95,.7)",borderRadius:8,padding:"18px",textAlign:"center",cursor:"pointer",marginBottom:16,transition:"border-color .2s,background .2s",background:"rgba(8,20,35,.4)"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#3b82f6";e.currentTarget.style.background="rgba(29,78,216,.06)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(30,58,95,.7)";e.currentTarget.style.background="rgba(8,20,35,.4)";}}
+              >
+                <div style={{fontSize:24,marginBottom:6,opacity:.5}}>🖼️</div>
+                <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#475569",letterSpacing:1,margin:0}}>Clique pour joindre une photo de la galerie</p>
+                <input ref={photoRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoSelect}/>
+              </div>
+            ) : (
+              <div style={{marginBottom:16,borderRadius:8,overflow:"hidden",border:"1px solid rgba(59,130,246,.25)",position:"relative"}}>
+                <img src={photoPreview} alt="aperçu" style={{width:"100%",maxHeight:180,objectFit:"cover",display:"block"}}/>
+                <div style={{padding:"10px 14px",background:"rgba(8,20,35,.8)"}}>
+                  <input
+                    type="text"
+                    value={photoCaption}
+                    onChange={e=>setPhotoCaption(e.target.value)}
+                    placeholder="Légende de la photo (optionnel)…"
+                    style={{marginBottom:0,fontSize:12}}
+                  />
+                </div>
+                <button onClick={removePhoto} style={{position:"absolute",top:8,right:8,background:"rgba(2,12,27,.8)",border:"1px solid rgba(239,68,68,.4)",color:"#f87171",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:11}}>✕ Retirer</button>
+              </div>
+            )}
+
+            {err&&<p style={{color:"#f87171",fontSize:12,marginBottom:12,fontFamily:"'Outfit',sans-serif"}}>{err}</p>}
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn-primary" onClick={sendMessage} disabled={sending}>{sending?"Envoi…":"Sceller le message 🔒"}</button>
+              <button className="btn-ghost" onClick={()=>{setShowForm(false);setText("");setUnlockDate("");setErr("");}}>Annuler</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Contenu ── */}
+      {loading && (
+        <div style={{textAlign:"center",padding:"48px 0"}}>
+          <div style={{width:32,height:32,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/>
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          {/* Messages pour moi */}
+          {forMe.length > 0 && (
+            <div style={{marginBottom:40}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+                <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Messages pour toi</span>
+                <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                {forMe.map(m=><CapsuleCard key={m.id} msg={m} user={user}/>)}
+              </div>
+            </div>
+          )}
+
+          {/* Messages de moi */}
+          {fromMe.length > 0 && (
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+                <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Tes messages envoyés</span>
+                <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                {fromMe.map(m=><CapsuleCard key={m.id} msg={m} user={user}/>)}
+              </div>
+            </div>
+          )}
+
+          {/* Onglet vide */}
+          {forMe.length === 0 && fromMe.length === 0 && (
+            <div style={{textAlign:"center",padding:"80px 0"}}>
+              <div style={{fontSize:52,marginBottom:16,opacity:.3}}>{emptyPoem.icon}</div>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#334155",fontStyle:"italic",lineHeight:1.7}}>{emptyPoem.text}</p>
+              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",marginTop:10,letterSpacing:2}}>{emptyPoem.sub}</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+
+// ─── Mémoire · Loterie de la Nostalgie ───────────────────────────────────────
+function MemoirePage({user}) {
+  const LOTTO_KEY    = "nh_last_lotto_ts";
+  const COOLDOWN_MS  = 72 * 60 * 60 * 1000; // 72 h
+
+  const [messages,    setMessages]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [souvenir,    setSouvenir]    = useState(null);
+  const [lastTs,      setLastTs]      = useState(() => {
+    try { return parseInt(localStorage.getItem(LOTTO_KEY) || "0", 10) || 0; } catch { return 0; }
+  });
+  const [countdown,   setCountdown]   = useState("");
+  const [canPick,     setCanPick]     = useState(false);
+  const [picking,     setPicking]     = useState(false); // bref effet de tirage
+
+  // ── Chargement des messages ─────────────────────────────────────────────────
+  useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotMessages((data) => {
+        setMessages(data);
+        setLoading(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  // ── Compte-à-rebours + bouton actif/désactivé ──────────────────────────────
+  useEffect(() => {
+    const tick = () => {
+      const elapsed  = Date.now() - lastTs;
+      const remaining = COOLDOWN_MS - elapsed;
+      if (remaining <= 0) {
+        setCanPick(true);
+        setCountdown("");
+      } else {
+        setCanPick(false);
+        const totalSec = Math.ceil(remaining / 1000);
+        const d = Math.floor(totalSec / 86400);
+        const h = Math.floor((totalSec % 86400) / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        let label = "Prochaine pioche dans ";
+        if (d > 0) label += `${d}j `;
+        label += `${String(h).padStart(2,"0")}h ${String(m).padStart(2,"0")}m`;
+        if (d === 0) label += ` ${String(s).padStart(2,"0")}s`;
+        setCountdown(label);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lastTs]);
+
+  // ── Tirage au sort ──────────────────────────────────────────────────────────
+  const piocher = () => {
+    if (!canPick || picking) return;
+    // Messages > 7 jours déverrouillés
+    const SEPT_J = 7 * 24 * 60 * 60 * 1000;
+    const pool = messages.filter(m => {
+      const ts = parseLocalDate(m.unlockDate).getTime();
+      return ts <= Date.now() && (Date.now() - ts) > SEPT_J;
+    });
+    if (!pool.length) return;
+
+    setPicking(true);
+    setTimeout(async () => {
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+      // Essayer de piocher une photo de l'album pour illustrer
+      let albumPhoto = null;
+      try {
+        const photos = await fbCall('fbGetPhotos');
+        if (photos.length) {
+          albumPhoto = photos[Math.floor(Math.random() * photos.length)];
+        }
+      } catch(e) {}
+      const ts = Date.now();
+      try { localStorage.setItem(LOTTO_KEY, String(ts)); } catch {}
+      setLastTs(ts);
+      setSouvenir({...picked, _albumPhoto: albumPhoto});
+      setPicking(false);
+    }, 600);
+  };
+
+  const SEPT_J = 7 * 24 * 60 * 60 * 1000;
+  const unlockedCount = messages.filter(m => {
+    const ts = parseLocalDate(m.unlockDate).getTime();
+    return ts <= Date.now() && (Date.now() - ts) > SEPT_J;
+  }).length;
+
+  // ── Formatage de date ───────────────────────────────────────────────────────
+  const fmtSouvenir = (unlockDate) => {
+    const d = parseLocalDate(unlockDate);
+    return d.toLocaleDateString("fr-FR", {day:"numeric", month:"long", year:"numeric"});
+  };
+
+  return (
+    <div className="page-inner" style={{position:"relative",zIndex:1,padding:"60px 24px 100px",maxWidth:720,margin:"0 auto"}}>
+
+      {/* ── En-tête ── */}
+      <div className="fade-up" style={{textAlign:"center",marginBottom:48}}>
+        <span style={{color:"#1e3a5f",fontFamily:"'Space Mono',monospace",fontSize:11,letterSpacing:4}}>◆ — MÉMOIRE — ◆</span>
+        <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(34px,5vw,56px)",fontWeight:300,color:"#e2e8f0",marginTop:8}}>
+          Loterie de la Nostalgie
+        </h2>
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",color:"#475569",fontSize:16,marginTop:8}}>
+          Laisse le hasard raviver un souvenir scellé…
+        </p>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}>
+          <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+          <span style={{color:"#1e3a5f",fontSize:10}}>✨</span>
+          <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+        </div>
+      </div>
+
+      {/* ── Zone centrale ── */}
+      <div className="fade-up-d1" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:32}}>
+
+        {/* Compteur de souvenirs disponibles */}
+        {!loading && (
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:"#334155",textAlign:"center"}}>
+            {unlockedCount === 0
+              ? "Aucun souvenir déverrouillé pour l'instant"
+              : `${unlockedCount} souvenir${unlockedCount > 1 ? "s" : ""} dans l'urne`
+            }
+          </div>
+        )}
+
+        {/* Bouton principal */}
+        <div style={{textAlign:"center"}}>
+          <button
+            className="btn-primary"
+            onClick={piocher}
+            disabled={!canPick || picking || loading || unlockedCount === 0}
+            style={{
+              padding:"16px 40px",
+              fontSize:13,
+              letterSpacing:2,
+              position:"relative",
+              overflow:"hidden",
+              transition:"all .3s",
+              opacity: (!canPick || unlockedCount === 0) ? .55 : 1,
+            }}
+          >
+            {picking ? "Tirage en cours…" : "✨ Piocher un souvenir"}
+          </button>
+
+          {!canPick && !picking && (
+            <p style={{marginTop:12,fontFamily:"'Space Mono',monospace",fontSize:11,color:"#334155",letterSpacing:1}}>
+              {countdown}
+            </p>
+          )}
+          {canPick && !picking && !souvenir && (
+            <p style={{marginTop:10,fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",letterSpacing:2}}>
+              ✦ Le hasard choisit pour vous ✦
+            </p>
+          )}
+        </div>
+
+        {/* ── Carte du souvenir pioché ── */}
+        {souvenir ? (
+          <div
+            className="fade-up"
+            style={{
+              width:"100%",
+              background:"rgba(13,27,42,.92)",
+              border:"1px solid rgba(96,165,250,.25)",
+              borderRadius:16,
+              padding:"32px 28px",
+              boxShadow:"0 0 60px rgba(59,130,246,.08)",
+              position:"relative",
+            }}
+          >
+            <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+
+            {/* Bandeau */}
+            <div style={{
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"center",
+              gap:8,
+              marginBottom:20,
+              paddingBottom:16,
+              borderBottom:"1px solid rgba(30,58,95,.5)",
+            }}>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:"#60a5fa"}}>
+                ✨ Souvenir scellé ♡
+              </span>
+            </div>
+
+            {/* Date d'origine */}
+            <div style={{
+              fontFamily:"'Space Mono',monospace",
+              fontSize:11,
+              color:"#334155",
+              letterSpacing:2,
+              textAlign:"center",
+              marginBottom:20,
+            }}>
+              {fmtSouvenir(souvenir.unlockDate)}
+            </div>
+
+            {/* Corps du message */}
+            <p style={{
+              fontFamily:"'Cormorant Garamond',serif",
+              fontStyle:"italic",
+              fontSize:"clamp(17px,2.5vw,22px)",
+              lineHeight:1.85,
+              color:"#cbd5e1",
+              textAlign:"center",
+              whiteSpace:"pre-wrap",
+              margin:0,
+              padding:"0 8px",
+            }}>
+              {souvenir.text}
+            </p>
+
+            {/* Photo souvenir si présente */}
+            {souvenir.photoUrl && (
+              <div style={{marginTop:20,borderRadius:10,overflow:"hidden",border:"1px solid rgba(59,130,246,.2)"}}>
+                <img src={souvenir.photoUrl} alt={souvenir.photoCaption||"souvenir"} style={{width:"100%",maxHeight:260,objectFit:"cover",display:"block"}}/>
+                {souvenir.photoCaption && (
+                  <div style={{padding:"10px 16px",background:"rgba(8,20,35,.8)"}}>
+                    <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:14,color:"#94a3b8",margin:0,lineHeight:1.5,textAlign:"center"}}>{souvenir.photoCaption}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Photo aléatoire de l'album */}
+            {souvenir._albumPhoto && (
+              <div style={{marginTop:16,borderRadius:10,overflow:"hidden",border:"1px solid rgba(96,165,250,.15)",position:"relative"}}>
+                <img src={souvenir._albumPhoto.url} alt={souvenir._albumPhoto.caption||"album"} style={{width:"100%",maxHeight:220,objectFit:"cover",display:"block",filter:"brightness(.85)"}}/>
+                <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(2,12,27,.85) 0%,transparent 50%)",pointerEvents:"none"}}/>
+                <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"12px 16px"}}>
+                  <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#60a5fa",marginBottom:4}}>✦ Un moment de vous deux ✦</div>
+                  {souvenir._albumPhoto.caption && <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:13,color:"#e2e8f0",margin:0,lineHeight:1.5}}>{souvenir._albumPhoto.caption}</p>}
+                  {souvenir._albumPhoto.date && <p style={{fontFamily:"'Space Mono',monospace",fontSize:9,color:"#475569",margin:"4px 0 0",letterSpacing:1}}>{souvenir._albumPhoto.date}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* Auteur */}
+            <div style={{
+              marginTop:20,
+              paddingTop:16,
+              borderTop:"1px solid rgba(30,58,95,.5)",
+              textAlign:"right",
+            }}>
+              <span style={{
+                fontFamily:"'Cormorant Garamond',serif",
+                fontStyle:"italic",
+                fontSize:14,
+                color: souvenir.author==="lui" ? "#3b82f6" : "#f472b6",
+              }}>
+                — {souvenir.author==="lui" ? "Lui 💙" : "Elle 🌸"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* État vide / premier tirage */
+          !loading && (
+            <div style={{
+              width:"100%",
+              background:"rgba(13,27,42,.5)",
+              border:"1px dashed rgba(30,58,95,.6)",
+              borderRadius:16,
+              padding:"60px 28px",
+              textAlign:"center",
+            }}>
+              <div style={{fontSize:48,marginBottom:16,opacity:.25}}>✨</div>
+              <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:18,color:"#334155",lineHeight:1.7}}>
+                Votre souvenir pioché apparaîtra ici…
+              </p>
+              <p style={{fontFamily:"'Outfit',sans-serif",fontSize:11,color:"#1e3a5f",letterSpacing:2,marginTop:10}}>
+                Un tirage toutes les 72 heures ♡
+              </p>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+// Attend que Firebase soit init, puis transforme manuellement le script JSX
+(function() {
+  function runBabel() {
+    if (typeof Babel === "undefined" || typeof firebase === "undefined") {
+      return setTimeout(runBabel, 30);
+    }
+    // S'assurer que Firebase est bien init
+    if (!window.fbGetHearts) {
+      return setTimeout(runBabel, 30);
+    }
+    // Transformer le script JSX en JS et l'exécuter
+    var pending = document.getElementById("main-babel-script");
+    if (!pending) return;
+    try {
+      var src = pending.textContent || pending.innerHTML;
+      var transformed = Babel.transform(src, { presets: ["react"] }).code;
+      var s = document.createElement("script");
+      s.textContent = transformed;
+      document.body.appendChild(s);
+    } catch(e) {
+      console.error("Babel transform error:", e);
+    }
+  }
+  runBabel();
+})();
+</script>
+</body>
+</html>
