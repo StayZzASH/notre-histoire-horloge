@@ -49,7 +49,7 @@ self.addEventListener("notificationclick", function(event) {
             return list[i].focus();
           }
         }
-        return clients.openWindow("/");
+        return clients.openWindow("https://anymz.netlify.app/");
       })
   );
 });
