@@ -72,7 +72,7 @@ async function sendToTokens(tokens, title, body, type) {
         badge: "/icon-72.png",
         vibrate: [200, 100, 200],
       },
-      fcmOptions: { link: "https://stayzzash.github.io/notre-histoire-horloge/" },
+      fcmOptions: { link: "https://anymz.netlify.app/" },
     },
   });
   console.log(`  [${type}] succès:${res.successCount} échecs:${res.failureCount}`);
