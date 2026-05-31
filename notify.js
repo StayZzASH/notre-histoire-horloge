@@ -1,19 +1,16 @@
 // notify.js — Notifications "Notre Histoire" ♡
 // Déployé via GitHub Actions (cron toutes les 30 min)
-// Gère : file de notifs (cœurs/messages), déverrouillages, message quotidien (8h)
 
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore }        = require("firebase-admin/firestore");
 const { getMessaging }        = require("firebase-admin/messaging");
 
-// ── Init Firebase Admin ───────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 initializeApp({ credential: cert(serviceAccount) });
 
 const db        = getFirestore();
 const messaging = getMessaging();
 
-// ── Constantes ────────────────────────────────────────────────────────────────
 const START_DATE = new Date("2025-03-21T00:00:00Z");
 
 const LOVE_MESSAGES = [
@@ -29,7 +26,6 @@ const LOVE_MESSAGES = [
   "Tu es mon histoire préférée.",
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function getDayCount() {
   return Math.floor((Date.now() - START_DATE.getTime()) / 86400000);
 }
@@ -42,7 +38,6 @@ function todayStr() {
   return `${y}-${m}-${day}`;
 }
 
-// Récupère les tokens FCM par utilisateur (lui/elle)
 async function getTokensByUser() {
   const snap = await db.collection("fcm_tokens").get();
   const map = { lui: [], elle: [] };
@@ -56,7 +51,6 @@ async function getTokensByUser() {
   return map;
 }
 
-// Envoie une notification FCM à une liste de tokens
 async function sendToTokens(tokens, title, body, type) {
   if (!tokens || tokens.length === 0) {
     console.log(`  Aucun token pour ${type}`);
@@ -72,12 +66,12 @@ async function sendToTokens(tokens, title, body, type) {
         badge: "/icon-72.png",
         vibrate: [200, 100, 200],
       },
+      // ✅ NOUVEAU LIEN DE REDIRECTION
       fcmOptions: { link: "https://anymz.netlify.app/" },
     },
   });
   console.log(`  [${type}] succès:${res.successCount} échecs:${res.failureCount}`);
 
-  // Nettoyage des tokens invalides
   const invalid = ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"];
   res.responses.forEach((r, i) => {
     if (!r.success && invalid.includes(r.error?.code)) {
@@ -89,11 +83,8 @@ async function sendToTokens(tokens, title, body, type) {
   });
 }
 
-// ── 1. Traite la file de notifications (cœurs + messages scellés) ─────────────
-
-// Mappe l'ancien format (target: "user_A") vers le nouveau (to: "lui"/"elle")
 function resolveTarget(notifData) {
-  if (notifData.to)     return notifData.to; // nouveau format
+  if (notifData.to)     return notifData.to;
   if (notifData.target) {
     if (notifData.target === "user_A") return "lui";
     if (notifData.target === "user_B" || notifData.target === "user_N") return "elle";
@@ -129,13 +120,10 @@ async function processCollection(colName, sentField, tokensByUser) {
 }
 
 async function processNotifQueue(tokensByUser) {
-  // Nouveau format (mon code)
   await processCollection("notif_queue",      "sent", tokensByUser);
-  // Ancien format (ancien code)
   await processCollection("notification_queue", "read", tokensByUser);
 }
 
-// ── 2. Vérifie les messages qui se déverrouillent aujourd'hui ─────────────────
 async function checkMessageUnlocks(tokensByUser) {
   const today = todayStr();
   const snap = await db.collection("messages_caches")
@@ -147,7 +135,6 @@ async function checkMessageUnlocks(tokensByUser) {
     return;
   }
 
-  // Filtre ceux déjà notifiés aujourd'hui (le cron tourne toutes les 30 min)
   const toNotify = snap.docs.filter(doc => doc.data().unlockedNotified !== today);
   if (toNotify.length === 0) {
     console.log("Déverrouillages aujourd'hui : déjà notifiés.");
@@ -166,65 +153,50 @@ async function checkMessageUnlocks(tokensByUser) {
       `Le message de ${authorName} est enfin disponible ♡`,
       "message_unlock"
     );
-    // Marquer pour ne pas renvoyer lors du prochain run du cron
     await doc.ref.update({ unlockedNotified: today });
   }
 }
 
-// ── 3. Message d'amour quotidien (+ anniversaires le 21) ─────────────────────
 async function sendDailyMessage(tokensByUser) {
   const now   = new Date();
-  const day   = now.getDate();   // 1-31
-  const month = now.getMonth();  // 0-indexé, mars = 2
+  const day   = now.getDate();
+  const month = now.getMonth();
 
-  // Tous les tokens (lui + elle) pour les notifs communes
   const allTokens = [...(tokensByUser.lui || []), ...(tokensByUser.elle || [])];
 
-  // ── Cas 1 : 21 mars → anniversaire de l'année ──────────────────────────────
   if (day === 21 && month === 2) {
-    const years  = now.getFullYear() - 2025; // 0 la 1ère année, 1 la 2ème…
+    const years  = now.getFullYear() - 2025;
     const months = Math.round((Date.now() - START_DATE.getTime()) / (30.44 * 24 * 3600 * 1000));
     const title  = years >= 1
       ? `🎂 ${years} an${years > 1 ? "s" : ""} ensemble aujourd'hui ! 🎂`
       : `🎉 Notre premier anniversaire ensemble ! 🎉`;
     const body   = years >= 1
-      ? `Ça fait ${years} an${years > 1 ? "s" : ""} et ${months} mois qu'on s'est rencontrés — et c'est encore mieux chaque jour. Je t'aime. ♡`
+      ? `Ça fait ${years} an${years > 1 ? "s" : ""} et ${months} mois — et c'est encore mieux chaque jour. Je t'aime. ♡`
       : `Un an que tout a commencé, le 21 mars 2025. Merci d'être là, pour toujours. 🥂♡`;
-    console.log(`🎂 Anniversaire annuel → "${title}"`);
     await sendToTokens(allTokens, title, body, "anniv_annuel");
     return;
   }
 
-  // ── Cas 2 : autre 21 → mois-niversaire ────────────────────────────────────
   if (day === 21) {
     const moisEcoules = Math.round((Date.now() - START_DATE.getTime()) / (30.44 * 24 * 3600 * 1000));
-    const nomsMois = ["janvier","février","mars","avril","mai","juin",
-                      "juillet","août","septembre","octobre","novembre","décembre"];
     const title = `🥂 ${moisEcoules} mois ensemble ! 🥂`;
     const body  = `Déjà ${moisEcoules} mois depuis le 21 mars 2025 — et chaque journée est une chance de t'aimer encore plus fort. ♡`;
-    console.log(`🥂 Mois-niversaire (${moisEcoules} mois) → "${title}"`);
     await sendToTokens(allTokens, title, body, "anniv_mensuel");
     return;
   }
 
-  // ── Cas 3 : jour normal → message d'amour ─────────────────────────────────
   const dayCount = getDayCount();
   const message  = LOVE_MESSAGES[dayCount % LOVE_MESSAGES.length];
   const title    = `Jour ${dayCount} ensemble ♡`;
-  console.log(`Message quotidien → "${title}"`);
   await sendToTokens(allTokens, title, message, "daily");
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`\n🚀 notify.js — ${new Date().toISOString()}\n`);
-
   const tokensByUser = await getTokensByUser();
-
   await processNotifQueue(tokensByUser);
   await checkMessageUnlocks(tokensByUser);
   await sendDailyMessage(tokensByUser);
-
   console.log("\n✅ Terminé.\n");
 }
 
