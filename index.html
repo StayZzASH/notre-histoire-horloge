@@ -168,6 +168,75 @@
           .get()
           .then(function(s){ return s.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); });
       };
+
+      // ── Questions du soir Firebase (partagées) ─────────────────────────────
+      window.fbSetQuestionAnswer = function(user, dayKey, answer) {
+        var id = "q_" + dayKey + "_" + user;
+        return _db.collection("question_answers").doc(id).set({
+          user: user, dayKey: dayKey, answer: answer, savedAt: Date.now()
+        }, { merge: true });
+      };
+      window.fbOnSnapshotQuestionAnswers = function(dayKey, callback) {
+        return _db.collection("question_answers").where("dayKey", "==", dayKey)
+          .onSnapshot(function(snap) {
+            callback(snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }));
+          }, function(err){ console.error("onSnapshot questions:", err); });
+      };
+      // ── Besoin du moment ────────────────────────────────────────────────────
+      window.fbSetBesoin = function(user, besoin) {
+        var today = new Date().toISOString().split("T")[0];
+        return _db.collection("besoins").doc(user + "_" + today).set({
+          user: user, besoin: besoin, date: today, updatedAt: Date.now()
+        }, { merge: true });
+      };
+      window.fbOnSnapshotBesoins = function(callback) {
+        var today = new Date().toISOString().split("T")[0];
+        return _db.collection("besoins").where("date", "==", today)
+          .onSnapshot(function(snap) {
+            callback(snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }));
+          }, function(err){ console.error("onSnapshot besoins:", err); });
+      };
+      // ── Historique 7j des deux ──────────────────────────────────────────────
+      window.fbGetHistoriqueEtatBoth = function() {
+        var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 6);
+        var cutoffStr = cutoff.toISOString().split("T")[0];
+        return _db.collection("etats").where("date", ">=", cutoffStr)
+          .orderBy("date", "asc").get()
+          .then(function(s){ return s.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); });
+      };
+      // ── Mots gentils (messages perso stockés par couple) ────────────────────
+      window.fbGetMotsGentils = function() {
+        return _db.collection("mots_gentils").orderBy("createdAt","desc").get()
+          .then(function(s){ return s.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); }); });
+      };
+      window.fbAddMotGentil = function(from, to, text) {
+        var id = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+        return _db.collection("mots_gentils").doc(id).set({
+          from: from, to: to, text: text, createdAt: Date.now()
+        });
+      };
+
+      // ── Planifier notif 18h "Comment on va ?" ──────────────────────────────
+      window.fbScheduleEveningCheck = function() {
+        var now = new Date();
+        var target = new Date();
+        target.setHours(18, 0, 0, 0);
+        if (now >= target) target.setDate(target.getDate() + 1);
+        var msUntil = target - now;
+        clearTimeout(window._eveningNotifTimeout);
+        window._eveningNotifTimeout = setTimeout(function() {
+          if (Notification && Notification.permission === "granted") {
+            new Notification("Comment on va ? 💙", {
+              body: "C'est l'heure du check-in du soir — partage ton état ♡",
+              icon: "/icon-192.png",
+              badge: "/icon-72.png",
+              vibrate: [200, 100, 200],
+              tag: "evening-check",
+            });
+          }
+          window.fbScheduleEveningCheck();
+        }, msUntil);
+      };
     })();
   </script>
   <style>body{margin:0;background:#020c1b}#root{min-height:100vh}</style>
@@ -910,7 +979,20 @@ function HomePage({isAdmin, user}) {
               const isPlaying=playingId===song.id;
               return (
                 <div key={song.id} className="song-card-wrap" style={{minWidth:200,maxWidth:200,borderRadius:14,overflow:"hidden",background:"#0d1b2a",border:`1px solid ${isPlaying?"rgba(59,130,246,.5)":"#1e3a5f"}`,boxShadow:isPlaying?"0 0 30px rgba(59,130,246,.25)":"none",transition:"box-shadow .3s,border-color .3s",flexShrink:0,position:"relative"}}>
-                  <div onClick={()=>setPlayingId(isPlaying?null:song.id)} style={{height:200,background:grad,position:"relative",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                  <div onClick={()=>{
+                    setPlayingId(isPlaying?null:song.id);
+                    // Play audio if URL provided
+                    if (window._currentAudio) { window._currentAudio.pause(); window._currentAudio=null; }
+                    if (!isPlaying && song.url) {
+                      try {
+                        const a = new Audio(song.url);
+                        a.volume = 0.7;
+                        a.play().catch(()=>{});
+                        a.onended = () => setPlayingId(null);
+                        window._currentAudio = a;
+                      } catch(e) {}
+                    }
+                  }} style={{height:200,background:grad,position:"relative",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
                     <div style={{width:110,height:110,borderRadius:"50%",background:"radial-gradient(circle at 50%,#1a1a1a 28%,#2a2a2a 29%,#111 50%,#222 51%,#111 70%,#222 71%,#1a1a1a 100%)",boxShadow:"0 4px 20px rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",animation:isPlaying?"vinylSpin 3s linear infinite":"none"}}>
                       <div style={{width:28,height:28,borderRadius:"50%",background:"radial-gradient(circle,#333 40%,#222 100%)",border:"2px solid #444"}}/>
                     </div>
@@ -1359,7 +1441,10 @@ function App() {
     saveVisit(profile);
     setUser(profile);
     // Demande la permission de notifications et enregistre le token FCM
-
+    // Planifie la notif 18h "Comment on va ?"
+    if (typeof window.fbScheduleEveningCheck === "function") {
+      window.fbScheduleEveningCheck();
+    }
   };
 
   if(!user)return <SiteGate onUnlock={handleUnlock}/>;
@@ -1456,38 +1541,140 @@ const QUESTIONS_COUPLE = [
   {q:"C'est quoi notre plus belle qualité à nous en tant que couple ?", cat:"💛 Nous deux"},
   {q:"Dans 10 ans, tu t'imagines où, avec moi ?", cat:"🏡 Avenir"},
   {q:"Qu'est-ce que tu ferais si tu savais que je ne jugerai jamais ta réponse ?", cat:"🌙 Liberté"},
+  {q:"Quelle est la chanson qui te fait penser à nous automatiquement ?", cat:"🎵 Musique"},
+  {q:"Qu'est-ce que tu as changé dans ta façon d'aimer depuis qu'on est ensemble ?", cat:"🌱 Évolution"},
+  {q:"C'est quoi le truc que je fais qui t'énerve mais que tu trouves aussi adorable ?", cat:"😅 Doux chaos"},
+  {q:"Si on pouvait voyager n'importe où demain matin, tu choisis où ?", cat:"🌍 Voyage"},
+  {q:"Qu'est-ce que tu voudrais qu'on fasse plus souvent ensemble ?", cat:"💛 Nous deux"},
+  {q:"C'est quoi ton meilleur souvenir de nous depuis le début ?", cat:"💫 Souvenirs"},
+  {q:"Si tu pouvais m'offrir quelque chose d'inestimable, ce serait quoi ?", cat:"🎁 Don"},
+  {q:"Qu'est-ce qui te rend fier·ère de notre relation ?", cat:"🏆 Fierté"},
+  {q:"T'as un souvenir d'enfance que tu voudrais me raconter et que je connais pas encore ?", cat:"👶 Enfance"},
+  {q:"Si on écrivait un livre sur nous, quel serait le titre ?", cat:"📖 Histoire"},
+  {q:"Qu'est-ce que tu penses de notre façon de gérer les moments difficiles ?", cat:"🌊 Résilience"},
+  {q:"C'est quoi le truc que je ne sais pas que tu aimes en moi ?", cat:"🌸 Amour caché"},
+  {q:"Si tu pouvais revivre notre première rencontre, tu changerai quoi ?", cat:"⏪ Début"},
+  {q:"Qu'est-ce qui t'a convaincu(e) que tu voulais être avec moi ?", cat:"💡 Évidence"},
+  {q:"C'est quoi ton endroit préféré où on est allés ensemble ?", cat:"📍 Lieux"},
+  {q:"T'as déjà eu honte de quelque chose devant moi ? Quoi ?", cat:"😳 Vulnérabilité"},
+  {q:"Si tu devais m'apprendre quelque chose, ce serait quoi ?", cat:"🎓 Apprendre"},
+  {q:"Qu'est-ce que tu voudrais qu'on accomplisse ensemble avant la fin de l'année ?", cat:"🎯 Objectifs"},
+  {q:"C'est quoi le plat que tu veux absolument qu'on mange ensemble un jour ?", cat:"🍽️ Gourmandise"},
+  {q:"Si tu pouvais lire dans mes pensées pendant 5 minutes, tu regarderais quoi ?", cat:"🔮 Curiosité"},
+  {q:"Qu'est-ce qui te rassure quand t'es pas bien ?", cat:"🫂 Réconfort"},
+  {q:"C'est quoi une habitude que t'aimerais qu'on adopte tous les deux ?", cat:"🌱 Rituel"},
+  {q:"Si on avait une maison de rêve, tu la décrirais comment ?", cat:"🏡 Nid"},
+  {q:"C'est quoi le film ou la série que tu voudrais qu'on regarde ensemble maintenant ?", cat:"🎬 Soirée"},
+  {q:"Qu'est-ce qui te fait sentir le plus aimé(e) par moi ?", cat:"💝 Langages d'amour"},
+  {q:"T'as un rêve que t'oses pas vraiment me dire encore ?", cat:"🌙 Secret"},
+  {q:"Si tu pouvais changer quelque chose dans notre quotidien, ce serait quoi ?", cat:"✏️ Améliorer"},
+  {q:"C'est quoi le truc le plus bête qu'on ait fait ensemble et qui t'a quand même rendu heureux ?", cat:"😂 Rires"},
+  {q:"Qu'est-ce que tu penses qu'on a encore à apprendre l'un sur l'autre ?", cat:"🔍 Mystère"},
+  {q:"C'est quoi le cadeau que je t'ai fait ou dit qui t'a le plus marqué(e) ?", cat:"🎀 Mémoire"},
+  {q:"Si tu devais écrire une lettre à notre couple dans 5 ans, tu dirais quoi ?", cat:"💌 Avenir"},
+  {q:"Qu'est-ce que t'aimes dans notre façon de communiquer ?", cat:"🗣️ Échange"},
+  {q:"C'est quoi un truc sur toi que tu veux que je connaisse mieux ?", cat:"🔓 Ouverture"},
+  {q:"Si on était un duo de super-héros, on aurait quels pouvoirs ?", cat:"🦸 Fantaisie"},
+  {q:"Qu'est-ce qui t'a surpris(e) dans le fait d'être en couple avec moi ?", cat:"😲 Surprise"},
+  {q:"C'est quoi le moment où tu as réalisé que tu m'aimais vraiment ?", cat:"💗 Révélation"},
+  {q:"T'as quoi dans ta tête là, maintenant, que tu gardes pour toi ?", cat:"🤫 Ce soir"},
+  {q:"Qu'est-ce qu'on fait le mieux ensemble ?", cat:"⭐ Duo"},
+  {q:"Si tu pouvais me donner un conseil pour être encore meilleur(e) partenaire, ce serait quoi ?", cat:"💬 Grandir"},
+  {q:"C'est quoi le truc dont t'es le plus fier(ère) dans ta vie en ce moment ?", cat:"🌟 Fierté"},
+  {q:"Qu'est-ce qui te manque dans ta vie que je pourrais peut-être t'aider à combler ?", cat:"🫂 Besoin"},
+  {q:"C'est quoi ton rituel préféré qu'on a ensemble ?", cat:"✨ Rituel"},
+  {q:"Si on partait vivre dans un autre pays, lequel tu choisirais ?", cat:"🌍 Ailleurs"},
+  {q:"T'as déjà pleuré à cause de moi en bien ? Pour quoi ?", cat:"💧 Émotion"},
+  {q:"C'est quoi la valeur la plus importante dans notre relation pour toi ?", cat:"🧭 Valeurs"},
+  {q:"Qu'est-ce que tu veux encore découvrir de moi ?", cat:"🗺️ Explorer"},
+  {q:"Si tu devais me remplacer par un personnage de film, ce serait qui ? Pourquoi ?", cat:"🎭 Imaginaire"},
+  {q:"C'est quoi le moment où tu t'es senti(e) le plus proche de moi ?", cat:"🫀 Intimité"},
+  {q:"Qu'est-ce que t'as peur de perdre dans notre relation ?", cat:"🌊 Fragilité"},
+  {q:"Si tu pouvais planter une graine pour notre futur, ce serait quoi ?", cat:"🌻 Futur"},
+  {q:"C'est quoi une chose que tu veux vraiment faire avant tes 30 ans ?", cat:"⏳ Bucket list"},
+  {q:"Qu'est-ce que t'apprécies le plus dans notre façon d'être en désaccord ?", cat:"🕊️ Paix"},
+  {q:"C'est quoi un mot qui résume comment tu te sens avec moi ?", cat:"✍️ Un mot"},
+  {q:"Qu'est-ce que t'as appris sur toi-même grâce à moi ?", cat:"🪞 Miroir"},
+  {q:"Si tu devais m'acheter un cadeau avec 10€, ce serait quoi ?", cat:"🪙 Créatif"},
+  {q:"C'est quoi la chose la plus folle que tu ferais par amour ?", cat:"❤️‍🔥 Passion"},
+  {q:"Qu'est-ce qui te fait te sentir en sécurité dans notre relation ?", cat:"🔒 Sécurité"},
+  {q:"C'est quoi le truc qu'on n'a jamais fait ensemble et qu'on devrait faire cette année ?", cat:"📅 Cette année"},
+  {q:"T'as un talent caché que je ne connais pas encore ?", cat:"🎪 Talent"},
+  {q:"Qu'est-ce que tu gardes de ton enfance que tu veux transmettre plus tard ?", cat:"🧡 Héritage"},
+  {q:"C'est quoi notre meilleure blague ou private joke ?", cat:"😄 Complicité"},
+  {q:"Si tu pouvais remonter le temps, il y a un moment que tu voudrais rallonger ?", cat:"⏱️ Temps"},
+  {q:"Qu'est-ce qui t'anime vraiment en ce moment dans ta vie ?", cat:"🔥 Passion"},
+  {q:"C'est quoi un truc que t'admirais chez quelqu'un et que tu vois aussi en moi ?", cat:"🌠 Admiration"},
+  {q:"Si on faisait un défi ensemble ce week-end, ce serait lequel ?", cat:"🎯 Défi"},
+  {q:"Qu'est-ce que tu voudrais qu'on améliore dans notre façon de prendre soin l'un de l'autre ?", cat:"🌿 Soin"},
+  {q:"C'est quoi ta définition du bonheur, là maintenant ?", cat:"☀️ Bonheur"},
+  {q:"Qu'est-ce que t'as envie de me dire ce soir que tu n'oses pas toujours dire ?", cat:"🌙 Ce soir"},
+  {q:"Si on vivait une semaine sans téléphone ensemble, qu'est-ce qu'on ferait ?", cat:"📵 Déconnexion"},
+  {q:"C'est quoi le truc que je fais qui te touche sans que tu me le dises ?", cat:"🌸 Silencieux"},
+  {q:"Qu'est-ce que t'aimerais qu'on décide ensemble cette semaine ?", cat:"🤝 Décision"},
+  {q:"C'est quoi ton image mentale de nous dans 20 ans ?", cat:"🔭 Vision"},
+  {q:"T'as une peur irrationnelle que tu peux me confier ?", cat:"😨 Peur secrète"},
+  {q:"Qu'est-ce qui t'a rendu vraiment heureux(se) cette semaine ?", cat:"☀️ Semaine"},
+  {q:"C'est quoi le truc que tu veux faire pour moi mais que tu n'as pas encore fait ?", cat:"💝 Intention"},
+  {q:"Si on devait choisir un animal pour symboliser notre relation, ce serait lequel ?", cat:"🐾 Symbole"},
+  {q:"Qu'est-ce que t'aimes dans notre façon de dormir ensemble ?", cat:"🌙 Nuit"},
+  {q:"C'est quoi un livre, film ou chanson qui te parle de nous ?", cat:"🎨 Art"},
+  {q:"Qu'est-ce que tu penses que je pense de toi en ce moment précis ?", cat:"💭 Miroir"},
+  {q:"C'est quoi la chose la plus romantique qu'on ait vécue ensemble ?", cat:"💞 Romance"},
+  {q:"Qu'est-ce que t'apprécierais que je fasse plus pour toi ?", cat:"💌 Demande douce"},
+  {q:"Si tu pouvais m'appeler par un surnom pour toujours, ce serait lequel ?", cat:"💬 Surnom"},
+  {q:"C'est quoi un moment où tu t'es senti(e) particulièrement fier(ère) de moi ?", cat:"🌟 Fierté partagée"},
+  {q:"Qu'est-ce qui te rend unique à mes yeux, selon toi ?", cat:"🦋 Singularité"},
+  {q:"C'est quoi la chose que tu veux qu'on construise ensemble cette année ?", cat:"🏗️ Construire"},
+  {q:"Si on pouvait s'écrire une lettre à lire dans 10 ans, tu dirais quoi ?", cat:"📮 Temps"},
+  {q:"Qu'est-ce qui te fait encore butterflies quand tu penses à moi ?", cat:"🦋 Papillons"},
+  {q:"C'est quoi le dernier truc que j'ai fait qui t'a fait fondre ?", cat:"🫶 Fondu(e)"},
+  {q:"Qu'est-ce qu'on devrait célébrer qu'on célèbre pas encore ?", cat:"🎉 Célébration"},
+  {q:"C'est quoi la question que tu voudrais me poser mais n'oses pas ?", cat:"🔐 Question cachée"},
+  {q:"Si notre amour était une couleur, ce serait laquelle et pourquoi ?", cat:"🎨 Couleur"},
+  {q:"Qu'est-ce que tu veux qu'on garde pour toujours dans notre façon d'être ?", cat:"∞ Pour toujours"},
 ];
 
 function JeuQuestionsBlock({user}) {
-  const TODAY_KEY = "nh_question_" + new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
+  const TODAY_KEY = "nh_question_" + today;
   const dayIdx = Math.floor(Date.now() / 86400000);
   const dailyQ = QUESTIONS_COUPLE[dayIdx % QUESTIONS_COUPLE.length];
 
-  const [answer, setAnswer] = React.useState(() => {
-    try { return localStorage.getItem(TODAY_KEY + "_ans_" + user) || ""; } catch { return ""; }
-  });
-  const [saved, setSaved] = React.useState(() => {
-    try { return !!localStorage.getItem(TODAY_KEY + "_saved_" + user); } catch { return false; }
-  });
-  const [theirAnswer, setTheirAnswer] = React.useState(() => {
-    try { return localStorage.getItem(TODAY_KEY + "_ans_" + (user==="lui"?"elle":"lui")) || null; } catch { return null; }
-  });
+  const [answer, setAnswer] = React.useState("");
+  const [saved, setSaved] = React.useState(false);
+  const [theirAnswer, setTheirAnswer] = React.useState(null);
   const [revealed, setRevealed] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [loadingAnswers, setLoadingAnswers] = React.useState(true);
+
+  // Load answers from Firebase in real-time
+  React.useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotQuestionAnswers(TODAY_KEY, (docs) => {
+        const myDoc = docs.find(d => d.user === user);
+        const otherDoc = docs.find(d => d.user !== user);
+        if (myDoc) { setAnswer(myDoc.answer); setSaved(true); }
+        if (otherDoc) { setTheirAnswer(otherDoc.answer); }
+        setLoadingAnswers(false);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, [TODAY_KEY, user]);
 
   const handleSave = async () => {
     if (!answer.trim()) return;
     setSaving(true);
     try {
-      localStorage.setItem(TODAY_KEY + "_saved_" + user, "1");
-      localStorage.setItem(TODAY_KEY + "_ans_" + user, answer.trim());
+      await fbCall('fbSetQuestionAnswer', user, TODAY_KEY, answer.trim());
       const other = user === "lui" ? "elle" : "lui";
       await fbCall('fbQueueNotif', other, "question",
         "Question du soir ✦",
         (user==="lui"?"A":"N") + " a répondu à la question du soir — à toi ! 💙"
       );
       setSaved(true);
-    } catch(e) {}
+    } catch(e) { console.error(e); }
     setSaving(false);
   };
 
@@ -1775,6 +1962,231 @@ function HistoriqueBar({ historique, user }) {
   );
 }
 
+
+// ─── Besoin du moment ─────────────────────────────────────────────────────────
+const BESOINS_LIST = [
+  { id:"calin",    emoji:"🫂", label:"Câlin"      },
+  { id:"espace",   emoji:"🌬️", label:"Espace"     },
+  { id:"parler",   emoji:"💬", label:"Parler"     },
+  { id:"distraction", emoji:"🎮", label:"Distraction"},
+  { id:"silence",  emoji:"🤫", label:"Silence"    },
+  { id:"present",  emoji:"🫶", label:"Ta présence"},
+  { id:"rire",     emoji:"😂", label:"Rire"       },
+  { id:"dormir",   emoji:"💤", label:"Dormir"     },
+];
+
+function BesoinDuMomentBlock({user}) {
+  const other = user === "lui" ? "elle" : "lui";
+  const myColor   = user === "lui" ? "#93c5fd" : "#f9a8d4";
+  const theirColor= user === "lui" ? "#f9a8d4" : "#93c5fd";
+  const [myBesoin,    setMyBesoin]    = React.useState(null);
+  const [theirBesoin, setTheirBesoin] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      unsub = window.fbOnSnapshotBesoins((docs) => {
+        const me    = docs.find(d => d.user === user);
+        const other2= docs.find(d => d.user !== user);
+        if (me)     setMyBesoin(me.besoin);
+        if (other2) setTheirBesoin(other2.besoin);
+      });
+    });
+    return () => { if (unsub) unsub(); };
+  }, [user]);
+
+  const selectBesoin = async (id) => {
+    setSaving(true);
+    try {
+      await fbCall('fbSetBesoin', user, id);
+      await fbCall('fbQueueNotif', other, "besoin",
+        (user==="lui"?"A":"N") + " a besoin de toi ♡",
+        "Ce soir : " + BESOINS_LIST.find(b=>b.id===id)?.label
+      );
+    } catch(e) { console.error(e); }
+    setSaving(false);
+  };
+
+  const theirBesoinObj = BESOINS_LIST.find(b => b.id === theirBesoin);
+  const myBesoinObj    = BESOINS_LIST.find(b => b.id === myBesoin);
+
+  return (
+    <div style={{background:"rgba(13,27,42,.6)",border:"1px solid rgba(59,130,246,.2)",borderRadius:14,padding:"24px",marginBottom:16,position:"relative"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+        <span style={{fontSize:20}}>🫀</span>
+        <div>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#3b82f6",marginBottom:2}}>Besoin du moment</div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#e2e8f0"}}>Ce dont t'as besoin ce soir</div>
+        </div>
+        {theirBesoinObj && (
+          <div style={{marginLeft:"auto",textAlign:"right",background:"rgba(8,20,35,.6)",borderRadius:10,padding:"8px 14px",border:`1px solid ${theirColor}33`}}>
+            <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,color:theirColor,marginBottom:2}}>{user==="lui"?"Elle":"Lui"}</div>
+            <div style={{fontSize:22}}>{theirBesoinObj.emoji}</div>
+            <div style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#94a3b8"}}>{theirBesoinObj.label}</div>
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {BESOINS_LIST.map(b => {
+          const isActive = myBesoin === b.id;
+          return (
+            <button key={b.id} onClick={()=>selectBesoin(b.id)} disabled={saving}
+              style={{background: isActive?"rgba(29,78,216,.25)":"rgba(13,27,42,.6)",
+                border:`1px solid ${isActive?myColor:"rgba(30,58,95,.4)"}`,
+                borderRadius:10,padding:"10px 14px",cursor:"pointer",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                transition:"all .15s",transform:isActive?"scale(1.08)":"scale(1)",
+                boxShadow:isActive?`0 0 14px ${myColor}40`:"none"}}>
+              <span style={{fontSize:24}}>{b.emoji}</span>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:1,color:isActive?myColor:"#475569",textTransform:"uppercase"}}>{b.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {myBesoinObj && (
+        <p style={{marginTop:14,fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:14,color:"#94a3b8",textAlign:"center"}}>
+          Tu as besoin de : <span style={{color:myColor}}>{myBesoinObj.emoji} {myBesoinObj.label}</span> — {user==="lui"?"N":"A"} est prévenu(e) ♡
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Baromètre Duo (graphique 7j à 2 courbes) ─────────────────────────────────
+function BarometreDuoBlock() {
+  const [data, setData] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    waitForFirebase().then(async () => {
+      try {
+        const raw = await fbCall('fbGetHistoriqueEtatBoth');
+        setData(raw);
+      } catch(e) { console.error(e); }
+      setLoading(false);
+    });
+  }, []);
+
+  const HUMEUR_SCORE = {"🤩":5,"🥰":4,"😊":3,"😌":3,"😴":2,"😰":2,"🤒":2,"😔":1,"😩":1,"😡":1};
+  const ENERGIE_SCORE = {"🔋":4,"⚡":5,"😐":3,"🥱":2,"💤":1};
+
+  // Build 7 days grid
+  const days = Array.from({length:7}, (_,i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6-i));
+    return d.toISOString().split("T")[0];
+  });
+
+  const getScore = (etat) => {
+    if (!etat) return null;
+    const h = HUMEUR_SCORE[etat.humeur] || 3;
+    const e = ENERGIE_SCORE[etat.energie] || 3;
+    return Math.round(((h + e) / 2) * 20); // 0-100
+  };
+
+  const luiData  = days.map(day => { const e = data.find(d => d.user==="lui"  && d.date===day); return { day, score: getScore(e), etat:e }; });
+  const elleData = days.map(day => { const e = data.find(d => d.user==="elle" && d.date===day); return { day, score: getScore(e), etat:e }; });
+
+  const W = 320, H = 140, PAD = 20;
+  const chartW = W - PAD*2, chartH = H - PAD*2;
+
+  const toX = (i) => PAD + (i / 6) * chartW;
+  const toY = (score) => PAD + chartH - (score / 100) * chartH;
+
+  const pathFor = (dataArr) => {
+    const pts = dataArr.map((d,i) => d.score != null ? [toX(i), toY(d.score)] : null).filter(Boolean);
+    if (pts.length < 2) return "";
+    return pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  };
+
+  const dayLabels = ["lu","ma","me","je","ve","sa","di"];
+  const todayIdx = new Date().getDay(); // 0=dim
+  const weekDays = days.map(d => {
+    const wd = new Date(d+"T00:00:00").getDay();
+    return ["di","lu","ma","me","je","ve","sa"][wd];
+  });
+
+  if (loading) return (
+    <div style={{textAlign:"center",padding:"32px"}}><div style={{width:24,height:24,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>
+  );
+
+  const hasData = luiData.some(d=>d.score!=null) || elleData.some(d=>d.score!=null);
+
+  return (
+    <div style={{background:"rgba(13,27,42,.6)",border:"1px solid rgba(59,130,246,.2)",borderRadius:14,padding:"24px",marginTop:32,position:"relative"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20}}>
+        <span style={{fontSize:20}}>📊</span>
+        <div>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#3b82f6",marginBottom:2}}>Baromètre de la semaine</div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:"#e2e8f0"}}>Vos humeurs sur 7 jours</div>
+        </div>
+        <div style={{marginLeft:"auto",display:"flex",gap:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:20,height:2,background:"#60a5fa",borderRadius:1}}/>
+            <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#60a5fa"}}>A 💙</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:20,height:2,background:"#f472b6",borderRadius:1}}/>
+            <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,color:"#f472b6"}}>N 🌸</span>
+          </div>
+        </div>
+      </div>
+      {!hasData ? (
+        <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#334155",textAlign:"center",padding:"20px 0"}}>
+          Commencez à partager vos états pour voir votre baromètre ♡
+        </p>
+      ) : (
+        <div style={{overflowX:"auto"}}>
+          <svg viewBox={"0 0 " + W + " " + H} style={{width:"100%",maxWidth:W,display:"block",margin:"0 auto"}}>
+            {/* Grid lines */}
+            {[0,25,50,75,100].map(v => (
+              <line key={v} x1={PAD} y1={toY(v)} x2={W-PAD} y2={toY(v)}
+                stroke="#1e3a5f" strokeWidth=".5" strokeOpacity=".5"/>
+            ))}
+            {/* Day labels */}
+            {days.map((d,i) => (
+              <text key={d} x={toX(i)} y={H-4} textAnchor="middle"
+                fontFamily="'Space Mono',monospace" fontSize="8" fill="#334155">
+                {weekDays[i]}
+              </text>
+            ))}
+            {/* Score labels */}
+            {[0,50,100].map(v => (
+              <text key={v} x={PAD-4} y={toY(v)+3} textAnchor="end"
+                fontFamily="'Space Mono',monospace" fontSize="7" fill="#334155">{v}</text>
+            ))}
+            {/* Lui line */}
+            {pathFor(luiData) && (
+              <path d={pathFor(luiData)} fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
+                style={{filter:"drop-shadow(0 0 4px #60a5fa88)"}}/>
+            )}
+            {/* Elle line */}
+            {pathFor(elleData) && (
+              <path d={pathFor(elleData)} fill="none" stroke="#f472b6" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
+                style={{filter:"drop-shadow(0 0 4px #f472b688)"}}/>
+            )}
+            {/* Dots lui */}
+            {luiData.map((d,i) => d.score != null && (
+              <g key={"lui"+i}>
+                <circle cx={toX(i)} cy={toY(d.score)} r="4" fill="#60a5fa" opacity=".9"/>
+                <title>{d.etat?.humeur} {d.etat?.energie} — score:{d.score}</title>
+              </g>
+            ))}
+            {/* Dots elle */}
+            {elleData.map((d,i) => d.score != null && (
+              <g key={"elle"+i}>
+                <circle cx={toX(i)} cy={toY(d.score)} r="4" fill="#f472b6" opacity=".9"/>
+              </g>
+            ))}
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EtatPage({ user }) {
   const [allEtats, setAllEtats]       = useState([]);
   const [historique, setHistorique]   = useState([]);
@@ -1934,6 +2346,9 @@ function EtatPage({ user }) {
 
           {/* ── Fonctionnalités mignonnes ── */}
           <div className="fade-up-d4" style={{marginTop:40}}>
+            {/* Besoin du moment */}
+            <BesoinDuMomentBlock user={user}/>
+
             {/* Compatibilité du jour */}
             {myEtat && theirEtat && (
               <CompatibiliteBlock myEtat={myEtat} theirEtat={theirEtat} user={user} other={other}/>
@@ -1944,7 +2359,168 @@ function EtatPage({ user }) {
 
             {/* Note secrète du jour */}
             <NoteSecrete user={user} other={other}/>
+
+            {/* Baromètre duo 7j */}
+            <BarometreDuoBlock/>
+
+            {/* Planning soirée */}
+            {myEtat && theirEtat && <PlaningSoireeBlock myEtat={myEtat} theirEtat={theirEtat}/>}
+
+            {/* Défi Amour du Jour */}
+            <DefiAmourBlock/>
+
+            {/* Mini Lettre du Cœur */}
+            <MiniLettreBlock user={user}/>
           </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+// ─── Planning Soirée ──────────────────────────────────────────────────────────
+function PlaningSoireeBlock({myEtat, theirEtat}) {
+  if (!myEtat || !theirEtat) return null;
+  const PLANS = {
+    high_high: [
+      {icon:"🎉", title:"Sortie spontanée", desc:"Vous êtes tous les deux au top — parfaite soirée pour sortir dîner ou voir des amis !"},
+      {icon:"🎬", title:"Film + pop-corn", desc:"Choisissez quelque chose que vous vouliez voir depuis longtemps."},
+      {icon:"🕯️", title:"Dîner aux bougies", desc:"Cuisinez ensemble quelque chose de nouveau."},
+    ],
+    high_low: [
+      {icon:"🛋️", title:"Cocon à la maison", desc:"L'un de vous a besoin de calme — soirée canapé, plaid, série douce."},
+      {icon:"🍵", title:"Moment douceur", desc:"Prépare-lui une tisane, mets une playlist soft. Prends soin de lui/elle."},
+      {icon:"💆", title:"Massage du dos", desc:"5 minutes de massage = 5 heures de bonheur. Essaie."},
+    ],
+    low_low: [
+      {icon:"🛌", title:"Soirée repos", desc:"C'est ok de rien faire. Dormez tôt ou regardez quelque chose de léger."},
+      {icon:"🐾", title:"Cocon sauvage", desc:"Commandez à manger, mettez du confort, câlinez-vous."},
+      {icon:"📱", title:"Jeu en coop", desc:"Jouer ensemble sur le même écran — même à distance c'est possible."},
+    ],
+  };
+  const ENERGIE_SCORE = {"🔋":3,"⚡":3,"😐":2,"🥱":1,"💤":1};
+  const myE   = ENERGIE_SCORE[myEtat.energie] || 2;
+  const theirE= ENERGIE_SCORE[theirEtat.energie] || 2;
+  const avg = (myE + theirE) / 2;
+  const key = avg >= 2.5 ? "high_high" : avg >= 1.5 ? "high_low" : "low_low";
+  const dayIdx = Math.floor(Date.now() / 86400000);
+  const plans = PLANS[key];
+  const plan = plans[dayIdx % plans.length];
+
+  return (
+    <div style={{background:"rgba(13,27,42,.6)",border:"1px solid rgba(96,165,250,.15)",borderRadius:14,padding:"20px 24px",marginBottom:16,position:"relative"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+        <span style={{fontSize:22}}>{plan.icon}</span>
+        <div>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#3b82f6",marginBottom:2}}>Planning soirée</div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:"#e2e8f0"}}>{plan.title}</div>
+        </div>
+      </div>
+      <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:15,color:"#94a3b8",lineHeight:1.6,margin:0}}>{plan.desc}</p>
+    </div>
+  );
+}
+
+// ─── Défi Amour du Jour ────────────────────────────────────────────────────────
+const DEFIS_AMOUR = [
+  "Envoie-lui un message qui commence par 'Ce que j'aime le plus chez toi c'est…'",
+  "Prends une photo de quelque chose qui te fait penser à lui/elle aujourd'hui.",
+  "Dis-lui quelque chose que tu n'as pas osé dire depuis longtemps.",
+  "Écris-lui un haïku sur vos moments ensemble.",
+  "Raconte-lui un souvenir de vous que tu n'as jamais mentionné.",
+  "Fais-lui une surprise, même minuscule : son plat préféré, un message vocal, un dessin.",
+  "Partage une playlist qui résume comment tu te sens aujourd'hui.",
+  "Dessine quelque chose pour lui/elle, même maladroitement.",
+  "Envoie-lui une photo de toi en ce moment, sans filtre.",
+  "Dis-lui 3 choses qui te rendent reconnaissant(e) de l'avoir dans ta vie.",
+  "Planifie une mini-surprise pour cette semaine.",
+  "Raconte-lui un rêve que tu as fait récemment.",
+  "Écris-lui une liste des 5 choses que tu veux vivre avec lui/elle.",
+  "Prends soin de toi aujourd'hui — c'est aussi prendre soin de nous.",
+  "Demande-lui comment il/elle va, vraiment, avec curiosité.",
+];
+
+function DefiAmourBlock() {
+  const dayIdx = Math.floor(Date.now() / 86400000);
+  const defi = DEFIS_AMOUR[dayIdx % DEFIS_AMOUR.length];
+  const [done, setDone] = React.useState(() => {
+    try { return localStorage.getItem("nh_defi_done_"+new Date().toISOString().split("T")[0]) === "1"; } catch { return false; }
+  });
+
+  const markDone = () => {
+    setDone(true);
+    try { localStorage.setItem("nh_defi_done_"+new Date().toISOString().split("T")[0], "1"); } catch {}
+  };
+
+  return (
+    <div style={{background:"rgba(13,27,42,.6)",border:"1px solid rgba(244,114,182,.2)",borderRadius:14,padding:"20px 24px",marginBottom:16,position:"relative"}}>
+      <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+        <span style={{fontSize:22}}>🎯</span>
+        <div>
+          <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#f472b6",marginBottom:2}}>Défi Amour du jour</div>
+        </div>
+        {done && <span style={{marginLeft:"auto",fontFamily:"'Space Mono',monospace",fontSize:10,color:"#22c55e",letterSpacing:1}}>✓ Relevé !</span>}
+      </div>
+      <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"clamp(15px,2.5vw,18px)",color:"#e2e8f0",lineHeight:1.7,margin:"0 0 14px"}}>
+        "{defi}"
+      </p>
+      {!done && (
+        <button onClick={markDone} className="btn-ghost" style={{fontSize:12,letterSpacing:1}}>
+          ✓ Je l'ai fait !
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Mini Lettre du Cœur (message vocal/texte express) ─────────────────────────
+function MiniLettreBlock({user}) {
+  const other = user === "lui" ? "elle" : "lui";
+  const myColor = user === "lui" ? "#93c5fd" : "#f9a8d4";
+  const PROMPTS = [
+    "En ce moment je pense à toi parce que…",
+    "Si je pouvais te dire une chose maintenant, ce serait…",
+    "Ce soir j'ai envie que tu saches que…",
+    "Ce que j'ai adoré de toi aujourd'hui c'est…",
+    "Je veux juste te dire que…",
+  ];
+  const dayIdx = Math.floor(Date.now() / 86400000);
+  const prompt = PROMPTS[dayIdx % PROMPTS.length];
+  const [text, setText] = React.useState("");
+  const [sent, setSent] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+
+  const handleSend = async () => {
+    if (!text.trim()) return;
+    setSending(true);
+    try {
+      await fbCall('fbQueueNotif', other, "mini_lettre",
+        user === "lui" ? "💙 Un mot du cœur d'A" : "🌸 Un mot du cœur de N",
+        text.trim()
+      );
+      setSent(true);
+    } catch(e) { console.error(e); }
+    setSending(false);
+  };
+
+  return (
+    <div style={{background:"rgba(13,27,42,.5)",border:"1px dashed rgba(30,58,95,.6)",borderRadius:14,padding:"20px 24px",marginBottom:16}}>
+      <div style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:"#334155",marginBottom:10}}>✦ Mini Lettre du Cœur ✦</div>
+      {sent ? (
+        <div style={{textAlign:"center",padding:"10px"}}>
+          <div style={{fontSize:32,marginBottom:8}}>💌</div>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,color:myColor,margin:0}}>Ton mot est parti vers {user==="lui"?"N":"A"} ♡</p>
+        </div>
+      ) : (
+        <>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,color:"#94a3b8",marginBottom:12}}>"{prompt}"</p>
+          <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Continue la phrase…" rows={2} style={{marginBottom:10,resize:"none",fontSize:14}}/>
+          <button className="btn-primary" onClick={handleSend} disabled={sending||!text.trim()} style={{opacity:!text.trim()?.5:1,fontSize:12}}>
+            {sending?"Envoi…":"Envoyer ♡"}
+          </button>
         </>
       )}
     </div>
@@ -2286,13 +2862,144 @@ function CapsulePage({user, autoOpenForm, onFormOpened}) {
 
 
 // ─── Mémoire · Loterie de la Nostalgie ───────────────────────────────────────
+
+// ─── Mots Gentils ────────────────────────────────────────────────────────────
+// Chacun a ses propres mots gentils de l'autre, stockés en Firebase
+function MotsGentilsBlock({user}) {
+  const other = user === "lui" ? "elle" : "lui";
+  const myColor = user === "lui" ? "#93c5fd" : "#f9a8d4";
+  const theirColor = user === "lui" ? "#f9a8d4" : "#93c5fd";
+
+  const [mots, setMots] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [newMot, setNewMot] = React.useState("");
+  const [sending, setSending] = React.useState(false);
+  const [showForm, setShowForm] = React.useState(false);
+  const [currentIdx, setCurrentIdx] = React.useState(0);
+
+  // Mots reçus (from other → to me)
+  const reçus = mots.filter(m => m.from === other && m.to === user);
+  // Mots envoyés par moi
+  const envoyés = mots.filter(m => m.from === user);
+
+  React.useEffect(() => {
+    waitForFirebase().then(async () => {
+      try {
+        const data = await fbCall('fbGetMotsGentils');
+        setMots(data);
+      } catch(e) {}
+      setLoading(false);
+    });
+  }, []);
+
+  const handleSend = async () => {
+    if (!newMot.trim()) return;
+    setSending(true);
+    try {
+      await fbCall('fbAddMotGentil', user, other, newMot.trim());
+      // notif
+      await fbCall('fbQueueNotif', other, "mot_gentil",
+        user === "lui" ? "💙 A t'a laissé un mot doux" : "🌸 N t'a laissé un mot doux",
+        newMot.trim().slice(0,60) + (newMot.length > 60 ? "…" : "")
+      );
+      const data = await fbCall('fbGetMotsGentils');
+      setMots(data);
+      setNewMot("");
+      setShowForm(false);
+    } catch(e) { console.error(e); }
+    setSending(false);
+  };
+
+  const currentMot = reçus[currentIdx];
+
+  return (
+    <div style={{marginBottom:56}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>
+          {user==="lui"?"Ses Mots pour moi 🌸":"Ses Mots pour moi 💙"}
+        </span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+
+      {loading ? (
+        <div style={{textAlign:"center",padding:"32px"}}><div style={{width:24,height:24,border:"2px solid #1e3a5f",borderTopColor:"#3b82f6",borderRadius:"50%",margin:"0 auto",animation:"spin .8s linear infinite"}}/></div>
+      ) : reçus.length === 0 ? (
+        <div style={{background:"rgba(13,27,42,.4)",border:"1px dashed rgba(30,58,95,.5)",borderRadius:14,padding:"40px 24px",textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:12,opacity:.3}}>💌</div>
+          <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:17,color:"#334155",lineHeight:1.7}}>
+            {user==="lui"?"N":"A"} n'a pas encore laissé de mot doux pour toi…<br/>
+            <span style={{fontSize:14,color:"#1e3a5f"}}>Donne-lui une raison d'en écrire ♡</span>
+          </p>
+        </div>
+      ) : (
+        <div style={{position:"relative"}}>
+          <div className="fade-up" key={currentIdx} style={{background:"rgba(13,27,42,.85)",border:`1px solid ${theirColor}33`,borderRadius:16,padding:"32px 28px",position:"relative",boxShadow:`0 0 40px ${theirColor}10`,minHeight:140}}>
+            <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:3,textTransform:"uppercase",color:theirColor}}>
+                {user==="lui"?"Elle 🌸":"Lui 💙"} · {new Date(currentMot.createdAt).toLocaleDateString("fr-FR",{day:"numeric",month:"long"})}
+              </span>
+            </div>
+            <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:"clamp(17px,2.8vw,22px)",lineHeight:1.8,color:"#e2e8f0",textAlign:"center",margin:0,textShadow:`0 0 30px ${theirColor}30`}}>
+              "{currentMot.text}"
+            </p>
+          </div>
+          {reçus.length > 1 && (
+            <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:16,alignItems:"center"}}>
+              <button onClick={()=>setCurrentIdx(i=>(i-1+reçus.length)%reçus.length)} style={{background:"none",border:"1px solid rgba(30,58,95,.5)",borderRadius:"50%",width:36,height:36,cursor:"pointer",color:"#475569",fontSize:18}}>‹</button>
+              <span style={{fontFamily:"'Space Mono',monospace",fontSize:10,color:"#334155",letterSpacing:1}}>{currentIdx+1} / {reçus.length}</span>
+              <button onClick={()=>setCurrentIdx(i=>(i+1)%reçus.length)} style={{background:"none",border:"1px solid rgba(30,58,95,.5)",borderRadius:"50%",width:36,height:36,cursor:"pointer",color:"#475569",fontSize:18}}>›</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Laisser un mot doux pour l'autre */}
+      <div style={{marginTop:28,textAlign:"center"}}>
+        {!showForm ? (
+          <button className="btn-ghost" onClick={()=>setShowForm(true)} style={{fontSize:12,letterSpacing:1}}>
+            💌 Laisser un mot doux pour {user==="lui"?"N":"A"}
+          </button>
+        ) : (
+          <div style={{background:"rgba(13,27,42,.8)",border:"1px solid rgba(59,130,246,.2)",borderRadius:12,padding:"20px",textAlign:"left"}}>
+            <div className="corner-bracket tl"/><div className="corner-bracket br"/>
+            <p style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:myColor,marginBottom:12}}>
+              Ton mot doux pour {user==="lui"?"N 🌸":"A 💙"}
+            </p>
+            <textarea
+              value={newMot}
+              onChange={e=>setNewMot(e.target.value)}
+              placeholder="Écris quelque chose de sincère et beau…"
+              rows={3}
+              style={{marginBottom:12,resize:"vertical",fontSize:14}}
+            />
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn-primary" onClick={handleSend} disabled={sending||!newMot.trim()} style={{opacity:!newMot.trim()?.5:1}}>
+                {sending?"Envoi…":"Envoyer ♡"}
+              </button>
+              <button className="btn-ghost" onClick={()=>setShowForm(false)}>Annuler</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MemoirePage({user}) {
   const LOTTO_KEY    = "nh_last_lotto_ts";
-  const COOLDOWN_MS  = 72 * 60 * 60 * 1000; // 72 h
+  const COOLDOWN_MS  = 0; // Pas de cooldown — peut piocher à toute heure ♡
 
   const [messages,    setMessages]    = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [souvenir,    setSouvenir]    = useState(null);
+  const [souvenir,    setSouvenir]    = useState(() => {
+    try { const s = localStorage.getItem("nh_souvenir"); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const setSouvenirPersist = (val) => {
+    setSouvenir(val);
+    try { if(val) localStorage.setItem("nh_souvenir", JSON.stringify(val)); else localStorage.removeItem("nh_souvenir"); } catch {}
+  };
   const [lastTs,      setLastTs]      = useState(() => {
     try { return parseInt(localStorage.getItem(LOTTO_KEY) || "0", 10) || 0; } catch { return 0; }
   });
@@ -2321,7 +3028,7 @@ function MemoirePage({user}) {
         setCanPick(true);
         setCountdown("");
       } else {
-        setCanPick(false);
+        setCanPick(true); // Cooldown désactivé, toujours actif
         const totalSec = Math.ceil(remaining / 1000);
         const d = Math.floor(totalSec / 86400);
         const h = Math.floor((totalSec % 86400) / 3600);
@@ -2364,7 +3071,7 @@ function MemoirePage({user}) {
       const ts = Date.now();
       try { localStorage.setItem(LOTTO_KEY, String(ts)); } catch {}
       setLastTs(ts);
-      setSouvenir({...picked, _albumPhoto: albumPhoto});
+      setSouvenirPersist({...picked, _albumPhoto: albumPhoto});
       setPicking(false);
     }, 600);
   };
@@ -2401,6 +3108,9 @@ function MemoirePage({user}) {
       </div>
 
       {/* ── Zone centrale ── */}
+      {/* ── Mots Gentils ── */}
+      <MotsGentilsBlock user={user}/>
+
       <div className="fade-up-d1" style={{display:"flex",flexDirection:"column",alignItems:"center",gap:32}}>
 
         {/* Compteur de souvenirs disponibles */}
