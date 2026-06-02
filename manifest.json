@@ -11,10 +11,90 @@
   "lang": "fr",
   "gcm_sender_id": "734347959336",
   "icons": [
-    { "src": "/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "💭 Saisir mon état",
+      "short_name": "Mon État",
+      "description": "Partage ton humeur et ton énergie du jour",
+      "url": "/?shortcut=etat",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "🌙 Question du soir",
+      "short_name": "Question",
+      "description": "Réponds à la question du soir et découvre la réponse de l'autre",
+      "url": "/?shortcut=question",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "✨ Piocher un souvenir",
+      "short_name": "Souvenir",
+      "description": "Laisse le hasard raviver un souvenir scellé",
+      "url": "/?shortcut=memoire",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "💌 Capsule secrète",
+      "short_name": "Capsule",
+      "description": "Écrire ou lire une capsule temporelle",
+      "url": "/?shortcut=capsule",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "categories": [
+    "lifestyle",
+    "social"
+  ],
+  "prefer_related_applications": false
 }
