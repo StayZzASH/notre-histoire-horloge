@@ -217,6 +217,67 @@
       };
 
       // ── Planifier notif 18h "Comment on va ?" ──────────────────────────────
+
+      // ── Présence utilisateur (dernière connexion) ─────────────────────────
+      window.fbSetPresence = function(user) {
+        var now = Date.now();
+        return _db.collection("presence").doc(user).set({
+          user: user,
+          lastSeen: now,
+          minuteKey: Math.floor(now / 60000), // pour détecter connexion simultanée
+          updatedAt: now
+        }, { merge: true });
+      };
+      window.fbOnSnapshotPresence = function(callback) {
+        return _db.collection("presence")
+          .onSnapshot(function(snap) {
+            var data = {};
+            snap.forEach(function(d) { data[d.id] = d.data(); });
+            callback(data);
+          }, function(err){ console.error("onSnapshot presence:", err); });
+      };
+      // Met à jour la présence toutes les 30 secondes
+      window.fbStartPresenceHeartbeat = function(user) {
+        window.fbSetPresence(user);
+        clearInterval(window._presenceInterval);
+        window._presenceInterval = setInterval(function() {
+          window.fbSetPresence(user);
+        }, 30000);
+      };
+
+      // ── Feature 6 : Évolution Circadienne ─────────────────────────────────
+      (function applyCircadian() {
+        var THEMES = {
+          dawn:    { from:5,  to:7,  label:"Aube",           bg:"#050810", accent:"#ff9966", sub:"rgba(120,60,30,.4)", border:"rgba(120,60,30,.35)" },
+          morning: { from:7,  to:11, label:"Matin",          bg:"#030d1a", accent:"#60a5fa", sub:"rgba(30,80,160,.4)", border:"rgba(30,58,95,.4)" },
+          noon:    { from:11, to:14, label:"Midi",            bg:"#020c1b", accent:"#93c5fd", sub:"rgba(20,60,130,.35)",border:"rgba(30,58,95,.35)" },
+          afternoon:{from:14, to:18, label:"Après-midi",     bg:"#040c1a", accent:"#818cf8", sub:"rgba(60,60,170,.35)",border:"rgba(80,80,160,.3)" },
+          golden:  { from:18, to:21, label:"Heure Dorée",    bg:"#0a0805", accent:"#fbbf24", sub:"rgba(120,80,0,.4)",  border:"rgba(120,80,0,.35)" },
+          night:   { from:21, to:24, label:"Nuit",            bg:"#020208", accent:"#a78bfa", sub:"rgba(80,40,150,.4)", border:"rgba(80,50,150,.3)" },
+          deep:    { from:0,  to:5,  label:"Nuit Profonde",   bg:"#010106", accent:"#7c3aed", sub:"rgba(50,10,100,.4)", border:"rgba(60,20,100,.3)" },
+        };
+        function getTheme(h) {
+          for (var k in THEMES) { var t=THEMES[k]; if (h>=t.from && h<t.to) return {key:k,theme:t}; }
+          return {key:"deep",theme:THEMES.deep};
+        }
+        function applyTheme() {
+          var h = new Date().getHours();
+          var info = getTheme(h);
+          var t = info.theme;
+          var root = document.documentElement;
+          root.style.setProperty("--nh-bg", t.bg);
+          root.style.setProperty("--nh-accent", t.accent);
+          root.style.setProperty("--nh-sub", t.sub);
+          root.style.setProperty("--nh-border", t.border);
+          document.body.style.transition = "background 45s ease";
+          document.body.style.background = t.bg;
+          var el = document.getElementById("nh-circadian-label");
+          if (el) { el.textContent = "● " + info.key.toUpperCase() + " · " + t.label; el.style.color = t.accent; }
+        }
+        applyTheme();
+        setInterval(applyTheme, 60000);
+        window._nhCircadianApply = applyTheme;
+      })();
       window.fbScheduleEveningCheck = function() {
         var now = new Date();
         var target = new Date();
@@ -332,10 +393,31 @@ function getDaysUntil(date) { return Math.max(0,Math.ceil((date.getTime()-Date.n
 
 const G = () => (
   <style>{`
+
+    /* ── Circadian CSS variables (défaut : Matin) ─────────────────── */
+    :root {
+      --nh-bg: #020c1b;
+      --nh-accent: #60a5fa;
+      --nh-sub: rgba(30,58,95,.4);
+      --nh-border: rgba(30,58,95,.4);
+    }
+    @keyframes circadianPulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+    .nh-circadian-indicator {
+      font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px;
+      text-transform:uppercase; animation:circadianPulse 4s ease-in-out infinite;
+      transition:color 30s ease;
+    }
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Outfit:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{background:#020c1b;color:#e2e8f0}
     ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#020c1b}::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px}
+
+    @keyframes syncFlash {
+      0%   { opacity:0; }
+      10%  { opacity:1; }
+      50%  { opacity:.8; }
+      100% { opacity:0; }
+    }
     @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pulseGlow{0%,100%{box-shadow:0 0 20px rgba(59,130,246,.2)}50%{box-shadow:0 0 40px rgba(59,130,246,.45)}}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
@@ -819,6 +901,239 @@ function FlashbackBlock() {
   );
 }
 
+
+// ─── ClockFace : Horloge SVG avec aiguille fantôme + flash connexion simultanée ─
+function ClockFace({ user }) {
+  const other = user === "lui" ? "elle" : "lui";
+  const myColor    = user === "lui" ? "#60a5fa" : "#f472b6";
+  const theirColor = user === "lui" ? "#f472b6" : "#60a5fa";
+
+  const [now, setNow] = React.useState(new Date());
+  const [presence, setPresence] = React.useState({});
+  const [isSyncFlash, setIsSyncFlash] = React.useState(false);
+  const [syncBadges, setSyncBadges] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("nh_sync_badges") || "[]"); } catch { return []; }
+  });
+
+  // Tick every second
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Listen to presence in real time
+  React.useEffect(() => {
+    let unsub;
+    waitForFirebase().then(() => {
+      if (typeof window.fbOnSnapshotPresence === "function") {
+        unsub = window.fbOnSnapshotPresence((data) => {
+          setPresence(data);
+          // Check simultaneous connection
+          const myMin    = data[user]?.minuteKey;
+          const theirMin = data[other]?.minuteKey;
+          const nowMin   = Math.floor(Date.now() / 60000);
+          if (myMin && theirMin && myMin === theirMin && myMin >= nowMin - 1) {
+            setIsSyncFlash(true);
+            setTimeout(() => setIsSyncFlash(false), 4000);
+            // Badge the hour sector
+            const h = new Date().getHours() % 12;
+            setSyncBadges(prev => {
+              const next = prev.includes(h) ? prev : [...prev, h];
+              try { localStorage.setItem("nh_sync_badges", JSON.stringify(next)); } catch {}
+              return next;
+            });
+          }
+        });
+      }
+    });
+    return () => { if (unsub) unsub(); };
+  }, [user, other]);
+
+  const R = 120; // radius
+  const CX = 140, CY = 140;
+  const size = 280;
+
+  // Convert time to angles
+  const secAngle  = (now.getSeconds() / 60) * 360;
+  const minAngle  = ((now.getMinutes() + now.getSeconds() / 60) / 60) * 360;
+  const hourAngle = ((now.getHours() % 12 + now.getMinutes() / 60) / 12) * 360;
+
+  // Shadow needle: other user's last seen time
+  const theirLastSeen = presence[other]?.lastSeen;
+  const theirDate = theirLastSeen ? new Date(theirLastSeen) : null;
+  const theirHourAngle = theirDate
+    ? ((theirDate.getHours() % 12 + theirDate.getMinutes() / 60) / 12) * 360
+    : null;
+  const theirMinAngle = theirDate
+    ? ((theirDate.getMinutes() + theirDate.getSeconds() / 60) / 60) * 360
+    : null;
+
+  const polarToXY = (angle, r) => {
+    const rad = ((angle - 90) * Math.PI) / 180;
+    return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+  };
+
+  const needle = (angle, len, width, color, opacity=1) => {
+    const tip = polarToXY(angle, len);
+    const tail = polarToXY(angle + 180, len * 0.18);
+    return (
+      <line x1={tail.x} y1={tail.y} x2={tip.x} y2={tip.y}
+        stroke={color} strokeWidth={width} strokeLinecap="round" opacity={opacity}/>
+    );
+  };
+
+  // Last seen label
+  const fmtSeen = (ts) => {
+    if (!ts) return null;
+    const d = new Date(ts);
+    const diffMin = Math.floor((Date.now() - ts) / 60000);
+    if (diffMin < 1) return "à l'instant";
+    if (diffMin < 60) return `il y a ${diffMin}min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `il y a ${diffH}h`;
+    return d.toLocaleDateString("fr-FR", {day:"numeric",month:"short"});
+  };
+
+  const theirLabel = fmtSeen(theirLastSeen);
+  const myLabel    = user === "lui" ? "A 💙" : "N 🌸";
+  const theirName  = user === "lui" ? "N 🌸" : "A 💙";
+
+  return (
+    <div style={{position:"relative",marginBottom:48}}>
+      {/* Flash de connexion simultanée */}
+      {isSyncFlash && (
+        <div style={{
+          position:"fixed",inset:0,pointerEvents:"none",zIndex:9998,
+          animation:"syncFlash 4s ease forwards",
+          background:"radial-gradient(ellipse at center, rgba(167,139,250,.18) 0%, transparent 70%)"
+        }}/>
+      )}
+
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <div style={{flex:1,height:1,background:"linear-gradient(to right,transparent,#1e3a5f)"}}/>
+        <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:"#334155"}}>Horloge de Notre Histoire</span>
+        <div style={{flex:1,height:1,background:"linear-gradient(to left,transparent,#1e3a5f)"}}/>
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <div style={{
+          position:"relative",
+          background:"rgba(8,20,35,.8)",
+          border:`2px solid ${isSyncFlash ? theirColor : "rgba(30,58,95,.5)"}`,
+          borderRadius:"50%",
+          width:size,
+          height:size,
+          boxShadow: isSyncFlash
+            ? `0 0 60px ${theirColor}88, 0 0 120px ${theirColor}44`
+            : "0 0 40px rgba(29,78,216,.12)",
+          transition:"border-color 1s, box-shadow 1s",
+          overflow:"hidden",
+        }}>
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            {/* Cadran de fond */}
+            <circle cx={CX} cy={CY} r={R} fill="rgba(8,20,35,.4)" stroke="rgba(30,58,95,.6)" strokeWidth="1"/>
+
+            {/* Graduations heure */}
+            {Array.from({length:12},(_,i) => {
+              const a = (i/12)*360;
+              const outer = polarToXY(a, R - 4);
+              const inner = polarToXY(a, R - 14);
+              const isSync = syncBadges.includes(i);
+              return (
+                <g key={i}>
+                  <line x1={outer.x} y1={outer.y} x2={inner.x} y2={inner.y}
+                    stroke={isSync ? theirColor : "rgba(30,58,95,.8)"} strokeWidth={isSync?2:1.5}/>
+                  {/* Badge secteur si connexion simultanée détectée */}
+                  {isSync && (
+                    <circle cx={polarToXY(a, R-22).x} cy={polarToXY(a, R-22).y} r="4"
+                      fill={theirColor} opacity=".7">
+                      <animate attributeName="opacity" values=".7;1;.7" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                  )}
+                  {/* Chiffres */}
+                  <text x={polarToXY(a, R-28).x} y={polarToXY(a, R-28).y+3}
+                    textAnchor="middle" fontFamily="'Space Mono',monospace" fontSize="9"
+                    fill={isSync ? theirColor : "#334155"}>
+                    {i === 0 ? "12" : i}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Graduations minutes */}
+            {Array.from({length:60},(_,i) => {
+              if (i % 5 === 0) return null;
+              const a = (i/60)*360;
+              const outer = polarToXY(a, R - 4);
+              const inner = polarToXY(a, R - 9);
+              return <line key={i} x1={outer.x} y1={outer.y} x2={inner.x} y2={inner.y}
+                stroke="rgba(30,58,95,.4)" strokeWidth=".8"/>;
+            })}
+
+            {/* ── Aiguille fantôme : dernière connexion de l'autre ── */}
+            {theirHourAngle !== null && (
+              <g opacity=".35">
+                {needle(theirHourAngle, R * 0.52, 3, theirColor, 1)}
+                {needle(theirMinAngle,  R * 0.72, 2, theirColor, 1)}
+                {/* Label "Ombre" */}
+                <circle cx={CX} cy={CY} r="6" fill="transparent" stroke={theirColor} strokeWidth="1" opacity=".4"/>
+              </g>
+            )}
+
+            {/* ── Aiguilles principales (heure actuelle) ── */}
+            {needle(hourAngle, R * 0.55, 4, myColor)}
+            {needle(minAngle,  R * 0.75, 3, myColor)}
+            {/* Trotteuse */}
+            {needle(secAngle, R * 0.82, 1.5, "#ef4444")}
+
+            {/* Centre */}
+            <circle cx={CX} cy={CY} r="5" fill={myColor} opacity=".8"/>
+            <circle cx={CX} cy={CY} r="2" fill="#fff" opacity=".9"/>
+          </svg>
+        </div>
+
+        {/* Légende */}
+        <div style={{display:"flex",gap:20,flexWrap:"wrap",justifyContent:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:20,height:3,background:myColor,borderRadius:2}}/>
+            <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:myColor,letterSpacing:1}}>{myLabel} · Maintenant</span>
+          </div>
+          {theirDate && (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:20,height:3,background:theirColor,borderRadius:2,opacity:.45}}/>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:theirColor,letterSpacing:1,opacity:.7}}>
+                {theirName} · {theirLabel}
+              </span>
+            </div>
+          )}
+          {!theirDate && (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:20,height:3,background:theirColor,borderRadius:2,opacity:.2}}/>
+              <span style={{fontFamily:"'Outfit',sans-serif",fontSize:10,color:"#334155",letterSpacing:1}}>
+                {theirName} · jamais connecté(e) ici
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Flash connexion simultanée — message */}
+        {isSyncFlash && (
+          <div style={{
+            background:`rgba(167,139,250,.15)`,border:`1px solid ${theirColor}`,
+            borderRadius:10,padding:"12px 20px",textAlign:"center",
+            animation:"fadeUp .4s ease",
+          }}>
+            <div style={{fontFamily:"'Space Mono',monospace",fontSize:10,letterSpacing:3,color:theirColor,marginBottom:4}}>✦ CONNEXION SIMULTANÉE ✦</div>
+            <p style={{fontFamily:"'Cormorant Garamond',serif",fontStyle:"italic",fontSize:16,color:"#e2e8f0",margin:0}}>
+              Vous êtes là en même temps ♡ Le cadran s'en souvient.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HomePage({isAdmin, user}) {
   const t = useTimer();
   const anniversaries = getAnniversaries();
@@ -923,6 +1238,11 @@ function HomePage({isAdmin, user}) {
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,flexWrap:"wrap"}}>
           <Digit value={t.days} label="Jours"/><Sep/><Digit value={t.hours} label="Heures"/><Sep/><Digit value={t.minutes} label="Minutes"/><Sep/><Digit value={t.seconds} label="Secondes"/>
         </div>
+      </div>
+
+      {/* ── Horloge SVG avec aiguille fantôme ── */}
+      <div className="fade-up-d4" style={{marginTop:56}}>
+        <ClockFace user={user}/>
       </div>
 
       <div style={{display:"flex",alignItems:"center",gap:16,margin:"56px 0 32px"}}>
@@ -1406,6 +1726,21 @@ function App() {
   const [openCapsuleForm, setOpenCapsuleForm] = useState(false);
   const isAdmin = user==="lui";
 
+  // Gestion des raccourcis PWA (?shortcut=etat|question|memoire|capsule)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sc = params.get("shortcut");
+    if (sc && ["etat","memoire","capsule","home"].includes(sc)) {
+      setPage(sc);
+    } else if (sc === "question") {
+      setPage("home"); // La question est sur home
+    }
+    // Clean URL without reload
+    if (sc) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   // Détection du 21 : mode anniversaire
   useEffect(() => {
     const today = new Date();
@@ -1445,6 +1780,12 @@ function App() {
     if (typeof window.fbScheduleEveningCheck === "function") {
       window.fbScheduleEveningCheck();
     }
+    // Démarre le heartbeat de présence + sauvegarde lastSeen en Firebase
+    waitForFirebase().then(function() {
+      if (typeof window.fbStartPresenceHeartbeat === "function") {
+        window.fbStartPresenceHeartbeat(profile);
+      }
+    });
   };
 
   if(!user)return <SiteGate onUnlock={handleUnlock}/>;
@@ -1463,12 +1804,13 @@ function App() {
         <video src="anniv.mp4" autoPlay loop muted playsInline />
       </div>
       <G/><BgDecor/>
-      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(2,12,27,.85)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(30,58,95,.4)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
+      <nav data-nh-nav="1" style={{position:"sticky",top:0,zIndex:100,background:"rgba(2,12,27,.85)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(30,58,95,.4)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
         <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setPage("home")}>
           <div style={{width:8,height:8,background:isAnniv?"#fcd34d":"#3b82f6",borderRadius:"50%",boxShadow:isAnniv?"0 0 10px #fcd34d":"0 0 8px #3b82f6",transition:"all .5s"}}/>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:isAnniv?"#fcd34d":"#93c5fd",letterSpacing:2,transition:"color .5s"}}>Notre Histoire</span>
             {navSubtitle && <span style={{fontFamily:"'Outfit',sans-serif",fontSize:9,letterSpacing:2,color:"#fcd34d",textTransform:"uppercase"}}>{navSubtitle}</span>}
+            {!navSubtitle && <span id="nh-circadian-label" className="nh-circadian-indicator" style={{color:"#334155",fontSize:9}}>● CHARGEMENT</span>}
           </div>
         </div>
         <div className="desktop-nav-links" style={{display:"flex",alignItems:"center",gap:24}}>
